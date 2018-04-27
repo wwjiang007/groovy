@@ -165,7 +165,6 @@ public class JavaStubGenerator {
                 }
 
                 public void addCovariantMethods(ClassNode cn) {}
-                protected void addTimeStamp(ClassNode node) {}
                 protected void addInitialization(ClassNode node) {}
                 protected void addPropertyMethod(MethodNode method) {
                     doAddMethod(method);
@@ -954,11 +953,9 @@ public class JavaStubGenerator {
         }
 
         for (String imp : imports) {
-            String s = new StringBuilder()
-                    .append("import ")
-                    .append(imp)
-                    .append((imp.charAt(imp.length() - 1) == '.') ? "*;" : ";")
-                    .toString()
+            String s = ("import " +
+                    imp +
+                    ((imp.charAt(imp.length() - 1) == '.') ? "*;" : ";"))
                     .replace('$', '.');
             out.println(s);
         }

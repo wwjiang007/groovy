@@ -1153,8 +1153,8 @@ public class Groovyc extends MatchingTask {
     }
 
     private String[] makeCommandLine(List<String> commandLineList) {
-        log.verbose("Compilation arguments:\n" + DefaultGroovyMethods.join(commandLineList, "\n"));
-        return commandLineList.toArray(new String[commandLineList.size()]);
+        log.verbose("Compilation arguments:\n" + DefaultGroovyMethods.join((Iterable)commandLineList, "\n"));
+        return commandLineList.toArray(new String[0]);
     }
 
     private void runForked(String[] commandLine) {

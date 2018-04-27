@@ -20,10 +20,10 @@ package org.codehaus.groovy.runtime.powerassert;
 
 /**
  * Indicates that a power assertion has failed.
- *
- * @author Peter Niederwieser
  */
 public class PowerAssertionError extends java.lang.AssertionError {
+    private static final long serialVersionUID = -2204531294530022591L;
+
     public PowerAssertionError(String msg) {
         super(msg);
     }

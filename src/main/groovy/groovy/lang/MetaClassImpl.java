@@ -137,7 +137,7 @@ public class MetaClassImpl implements MetaClass, MutableMetaClass {
             return o1.getName().compareTo(o2.getName());
         }
     };
-    private static final MetaMethod[] EMPTY = new MetaMethod[0];
+    private static final MetaMethod[] EMPTY = MetaMethod.EMPTY_ARRAY;
     private static final MetaMethod AMBIGUOUS_LISTENER_METHOD = new DummyMetaMethod();
 
     protected final Class theClass;
@@ -189,7 +189,7 @@ public class MetaClassImpl implements MetaClass, MutableMetaClass {
             List<MetaMethod> arr = new ArrayList<MetaMethod>();
             arr.addAll(Arrays.asList(metaMethods));
             arr.addAll(Arrays.asList(add));
-            myNewMetaMethods = arr.toArray(new MetaMethod[arr.size()]);
+            myNewMetaMethods = arr.toArray(MetaMethod.EMPTY_ARRAY);
             additionalMetaMethods = metaMethods;
         }
         else {
@@ -641,9 +641,7 @@ public class MetaClassImpl implements MetaClass, MutableMetaClass {
                     }
                 }
                 if (!skip) {
-                    if (!newGroovyMethodsSet.contains(method)) {
-                        newGroovyMethodsSet.add(method);
-                    }
+                    newGroovyMethodsSet.add(method);
                     addMetaMethodToIndex(method, mainClassMethodHeader);
                 }
             }
@@ -872,7 +870,7 @@ public class MetaClassImpl implements MetaClass, MutableMetaClass {
         if(isGetter) {
             final Class[] getPropertyArgs = {String.class};
             final MetaMethod method = findMethodInClassHierarchy(instance.getClass(), GET_PROPERTY_METHOD, getPropertyArgs, this);
-            if(method != null && method instanceof ClosureMetaMethod) {
+            if(method instanceof ClosureMetaMethod) {
                 onGetPropertyFoundInHierarchy(method);
                 return method.invoke(instance,new Object[]{propertyName});
             }
@@ -880,7 +878,7 @@ public class MetaClassImpl implements MetaClass, MutableMetaClass {
         else {
             final Class[] setPropertyArgs = {String.class, Object.class};
             final MetaMethod method = findMethodInClassHierarchy(instance.getClass(), SET_PROPERTY_METHOD, setPropertyArgs, this);
-            if(method != null && method instanceof ClosureMetaMethod) {
+            if(method instanceof ClosureMetaMethod) {
                 onSetPropertyFoundInHierarchy(method);
                 return method.invoke(instance, new Object[]{propertyName, optionalValue});
             }
@@ -943,7 +941,7 @@ public class MetaClassImpl implements MetaClass, MutableMetaClass {
             // still not method here, so see if there is an invokeMethod method up the hierarchy
             final Class[] invokeMethodArgs = {String.class, Object[].class};
             method = findMethodInClassHierarchy(instanceKlazz, INVOKE_METHOD_METHOD, invokeMethodArgs, this );
-            if(method != null && method instanceof ClosureMetaMethod) {
+            if(method instanceof ClosureMetaMethod) {
                 onInvokeMethodFoundInHierarchy(method);
                 return method.invoke(instance, invokeMethodArgs);
             }
@@ -1652,7 +1650,7 @@ public class MetaClassImpl implements MetaClass, MutableMetaClass {
             break;
         }
         // NOTE: must be changed to "1 |" if constructor was vargs
-        return 0 | (found << 8);
+        return (found << 8);
     }
 
     private CachedConstructor createCachedConstructor(Object[] arguments) {

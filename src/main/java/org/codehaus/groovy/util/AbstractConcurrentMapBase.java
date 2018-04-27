@@ -154,6 +154,7 @@ public abstract class AbstractConcurrentMapBase {
     }
 
     public static class Segment extends LockableObject {
+        private static final long serialVersionUID = -4128828550135386431L;
         volatile int count;
 
         int threshold;

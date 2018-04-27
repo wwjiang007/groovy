@@ -20,11 +20,12 @@ package org.codehaus.groovy.runtime.metaclass;
 
 /**
  * A stack less exception used to indicate, that the execution of a missingMethod
- * method failed with a MissingMethodException. This is used to preven a call to
+ * method failed with a MissingMethodException. This is used to prevent a call to
  * invokeMethod for GroovyObject implementing classes.
  */
 public class MissingMethodExecutionFailed extends MissingMethodExceptionNoStack {
-    private final Throwable cause;
+    private static final long serialVersionUID = -7894095278952483769L;
+    private Throwable cause;
     public MissingMethodExecutionFailed(String method, Class type, Object[] arguments, boolean isStatic, Throwable cause) {
         super(method, type, arguments, isStatic);
         this.cause = cause;

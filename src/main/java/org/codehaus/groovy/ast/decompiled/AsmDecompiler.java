@@ -25,7 +25,6 @@ import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.FieldVisitor;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import java.io.BufferedInputStream;
@@ -78,11 +77,9 @@ public abstract class AsmDecompiler {
         ClassStub stub = ref == null ? null : ref.get();
         if (stub == null) {
             DecompilingVisitor visitor = new DecompilingVisitor();
-            InputStream stream = url.openStream();
-            try {
-                new ClassReader(new BufferedInputStream(stream)).accept(visitor, ClassReader.SKIP_FRAMES);
-            } finally {
-                stream.close();
+
+            try (InputStream stream = new BufferedInputStream(url.openStream())) {
+                new ClassReader(stream).accept(visitor, ClassReader.SKIP_FRAMES);
             }
             stub = visitor.result;
             StubCache.map.put(uri, new SoftReference<ClassStub>(stub));

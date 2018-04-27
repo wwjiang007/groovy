@@ -97,8 +97,8 @@ import java.util.Map;
 public class SimpleTemplateEngine extends TemplateEngine {
     private boolean verbose;
     private static int counter = 1;
-
     private GroovyShell groovyShell;
+    private boolean escapeBackslash;
 
     public SimpleTemplateEngine() {
         this(GroovyShell.class.getClassLoader());
@@ -118,7 +118,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
     }
 
     public Template createTemplate(Reader reader) throws CompilationFailedException, IOException {
-        SimpleTemplate template = new SimpleTemplate();
+        SimpleTemplate template = new SimpleTemplate(escapeBackslash);
         String script = template.parse(reader);
         if (verbose) {
             System.out.println("\n-- script source --");
@@ -147,6 +147,16 @@ public class SimpleTemplateEngine extends TemplateEngine {
     private static class SimpleTemplate implements Template {
 
         protected Script script;
+        private boolean escapeBackslash;
+
+        public SimpleTemplate() {
+            this(false);
+        }
+
+        public SimpleTemplate(boolean escapeBackslash) {
+            this.escapeBackslash = escapeBackslash;
+        }
+
 
         public Writable make() {
             return make(null);
@@ -235,6 +245,25 @@ public class SimpleTemplateEngine extends TemplateEngine {
                 }
                 if (c == '\"') {
                     sw.write('\\');
+                }
+
+                /*
+                 *  GROOVY-4585
+                 *  Handle backslash characters.
+                 */
+                if (escapeBackslash) {
+                    if (c == '\\') {
+                        reader.mark(1);
+                        c = reader.read();
+                        if (c != '$') {
+                            sw.write("\\\\");
+                            reader.reset();
+                        } else {
+                            sw.write("\\$");
+                        }
+
+                        continue;
+                    }
                 }
                 /*
                  * Handle raw new line characters.
@@ -331,6 +360,13 @@ public class SimpleTemplateEngine extends TemplateEngine {
             }
             sw.write(";\nout.print(\"\"\"");
         }
+    }
 
+    public boolean isEscapeBackslash() {
+        return escapeBackslash;
+    }
+
+    public void setEscapeBackslash(boolean escapeBackslash) {
+        this.escapeBackslash = escapeBackslash;
     }
 }

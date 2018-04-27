@@ -32,11 +32,11 @@ import java.lang.reflect.Modifier;
  * <p>
  * <b>Note:</b> This exception as for internal use only!
  * 
- * @author Jochen Theodorou
  * @since Groovy 1.1
  */
 public class MethodSelectionException extends GroovyRuntimeException {
 
+    private static final long serialVersionUID = 8126246630023758333L;
     private final String methodName;
     private final FastArray methods;
     private final Class[] arguments;

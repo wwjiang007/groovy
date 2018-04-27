@@ -18,8 +18,6 @@
  */
 package org.codehaus.groovy.ast;
 
-import groovy.lang.groovydoc.Groovydoc;
-import groovy.lang.groovydoc.GroovydocHolder;
 import org.apache.groovy.ast.tools.ClassNodeUtils;
 import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.expr.BinaryExpression;
@@ -1442,9 +1440,8 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
     }
 
     public boolean isAnnotationDefinition() {
-        return redirect().isPrimaryNode &&
-               isInterface() &&
-               (getModifiers() & Opcodes.ACC_ANNOTATION)!=0;
+        return /* redirect().isPrimaryNode && */
+                isInterface() && (getModifiers() & Opcodes.ACC_ANNOTATION) != 0;
     }
 
     public List<AnnotationNode> getAnnotations() {

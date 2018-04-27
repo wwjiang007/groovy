@@ -24,7 +24,9 @@ import java.util.Set;
 import java.util.TreeSet;
 
 public class StringSetMap extends LinkedHashMap<String,Set<String>> {
-    
+
+    private static final long serialVersionUID = -8603734698633884431L;
+
     public StringSetMap() {
         super();
     }

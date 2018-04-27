@@ -17,24 +17,4 @@
  *  under the License.
  */
 
-import org.objectweb.asm.MethodVisitor
-import org.objectweb.asm.ClassWriter
-import org.objectweb.asm.Label
-
-import static org.objectweb.asm.Opcodes.ACC_PUBLIC
-import static org.objectweb.asm.Opcodes.ACC_STATIC
-import static org.objectweb.asm.Opcodes.ACC_SUPER
-import static org.objectweb.asm.Opcodes.ALOAD
-import static org.objectweb.asm.Opcodes.ATHROW
-import static org.objectweb.asm.Opcodes.INVOKESPECIAL
-import static org.objectweb.asm.Opcodes.RETURN
-import static org.objectweb.asm.Opcodes.V1_5
-
-buildscript {
-    repositories {
-        mavenCentral()
-    }
-    dependencies {
-        classpath "org.ow2.asm:asm:$asmVersion"
-    }
-}
+def v2 = """123""""""

@@ -27,11 +27,9 @@ import java.io.Writer;
 
 /**
  * A Writable File.
- *
- * @author John Wilson
- *
  */
 public class WritableFile extends File implements Writable {
+    private static final long serialVersionUID = 4157767752861425917L;
     private final String encoding;
 
     public WritableFile(final File delegate) {

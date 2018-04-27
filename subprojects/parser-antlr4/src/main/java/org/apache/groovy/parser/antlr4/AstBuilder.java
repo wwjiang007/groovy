@@ -1258,7 +1258,11 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     private void attachTraitAnnotation(ClassNode classNode) {
-        classNode.addAnnotation(new AnnotationNode(ClassHelper.make(GROOVY_TRANSFORM_TRAIT)));
+        attachAnnotation(classNode, GROOVY_TRANSFORM_TRAIT);
+    }
+
+    private void attachAnnotation(ClassNode classNode, String annotationClassName) {
+        classNode.addAnnotation(new AnnotationNode(ClassHelper.make(annotationClassName)));
     }
 
     @SuppressWarnings({"unchecked"})
@@ -2291,18 +2295,19 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                     return configureAST(propertyExpression, ctx);
                 }
             }
-        }
+        } else if (asBoolean(ctx.creator())) {
+            CreatorContext creatorContext = ctx.creator();
+            creatorContext.putNodeMetaData(ENCLOSING_INSTANCE_EXPRESSION, baseExpr);
 
-        if (asBoolean(ctx.indexPropertyArgs())) { // e.g. list[1, 3, 5]
+            return configureAST(this.visitCreator(creatorContext), ctx);
+        } else if (asBoolean(ctx.indexPropertyArgs())) { // e.g. list[1, 3, 5]
             Tuple2<Token, Expression> tuple = this.visitIndexPropertyArgs(ctx.indexPropertyArgs());
             boolean isSafeChain = isTrue(baseExpr, PATH_EXPRESSION_BASE_EXPR_SAFE_CHAIN);
 
             return configureAST(
                     new BinaryExpression(baseExpr, createGroovyToken(tuple.getFirst()), tuple.getSecond(), isSafeChain || asBoolean(ctx.indexPropertyArgs().QUESTION())),
                     ctx);
-        }
-
-        if (asBoolean(ctx.namedPropertyArgs())) { // this is a special way to new instance, e.g. Person(name: 'Daniel.Sun', location: 'Shanghai')
+        } else if (asBoolean(ctx.namedPropertyArgs())) { // this is a special way to new instance, e.g. Person(name: 'Daniel.Sun', location: 'Shanghai')
             List<MapEntryExpression> mapEntryExpressionList =
                     this.visitNamedPropertyArgs(ctx.namedPropertyArgs());
 
@@ -2339,9 +2344,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
             return configureAST(
                     new BinaryExpression(baseExpr, createGroovyToken(ctx.namedPropertyArgs().LBRACK().getSymbol()), right),
                     ctx);
-        }
-
-        if (asBoolean(ctx.arguments())) {
+        } else if (asBoolean(ctx.arguments())) {
             Expression argumentsExpr = this.visitArguments(ctx.arguments());
             configureAST(argumentsExpr, ctx);
 
@@ -2410,9 +2413,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
             // e.g. 1(), 1.1(), ((int) 1 / 2)(1, 2), {a, b -> a + b }(1, 2), m()()
             return configureAST(createCallMethodCallExpression(baseExpr, argumentsExpr), ctx);
-        }
-
-        if (asBoolean(ctx.closure())) {
+        } else if (asBoolean(ctx.closure())) {
             ClosureExpression closureExpression = this.visitClosure(ctx.closure());
 
             if (baseExpr instanceof MethodCallExpression) {
@@ -3147,9 +3148,23 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     @Override
     public Expression visitCreator(CreatorContext ctx) {
         ClassNode classNode = this.visitCreatedName(ctx.createdName());
-        Expression arguments = this.visitArguments(ctx.arguments());
 
         if (asBoolean(ctx.arguments())) { // create instance of class
+            Expression arguments = this.visitArguments(ctx.arguments());
+            Expression enclosingInstanceExpression = ctx.getNodeMetaData(ENCLOSING_INSTANCE_EXPRESSION);
+
+            if (null != enclosingInstanceExpression) {
+                if (arguments instanceof ArgumentListExpression) {
+                    ((ArgumentListExpression) arguments).getExpressions().add(0, enclosingInstanceExpression);
+                } else if (arguments instanceof TupleExpression) {
+                    throw createParsingFailedException("Creating instance of non-static class does not support named parameters", arguments);
+                } else if (arguments instanceof NamedArgumentListExpression) {
+                    throw createParsingFailedException("Unexpected arguments", arguments);
+                } else {
+                    throw createParsingFailedException("Unsupported arguments", arguments); // should never reach here
+                }
+            }
+
             if (asBoolean(ctx.anonymousInnerClassDeclaration())) {
                 ctx.anonymousInnerClassDeclaration().putNodeMetaData(ANONYMOUS_INNER_CLASS_SUPER_CLASS, classNode);
                 InnerClassNode anonymousInnerClassNode = this.visitAnonymousInnerClassDeclaration(ctx.anonymousInnerClassDeclaration());
@@ -3193,7 +3208,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
                 if (asBoolean(emptyDimList)) {
                     empties = new Expression[emptyDimList.size()];
-                    Arrays.setAll(empties, i -> ConstantExpression.EMPTY_EXPRESSION);
+                    Arrays.fill(empties, ConstantExpression.EMPTY_EXPRESSION);
                 } else {
                     empties = Expression.EMPTY_ARRAY;
                 }
@@ -4730,6 +4745,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
     private static final String PACKAGE_INFO = "package-info";
     private static final String PACKAGE_INFO_FILE_NAME = PACKAGE_INFO + ".groovy";
+
     private static final String GROOVY_TRANSFORM_TRAIT = "groovy.transform.Trait";
     private static final Set<String> PRIMITIVE_TYPE_SET = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("boolean", "char", "byte", "short", "int", "long", "float", "double")));
     private static final Logger LOGGER = Logger.getLogger(AstBuilder.class.getName());
@@ -4754,6 +4770,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     private static final String ANONYMOUS_INNER_CLASS_SUPER_CLASS = "_ANONYMOUS_INNER_CLASS_SUPER_CLASS";
     private static final String INTEGER_LITERAL_TEXT = "_INTEGER_LITERAL_TEXT";
     private static final String FLOATING_POINT_LITERAL_TEXT = "_FLOATING_POINT_LITERAL_TEXT";
+    private static final String ENCLOSING_INSTANCE_EXPRESSION = "_ENCLOSING_INSTANCE_EXPRESSION";
 
     private static final String CLASS_NAME = "_CLASS_NAME";
 }
