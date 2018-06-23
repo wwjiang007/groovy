@@ -876,4 +876,5 @@ public class GeneralUtils {
         return ((firstPackage == null && secondPackage == null) ||
                         firstPackage != null && secondPackage != null && firstPackage.getName().equals(secondPackage.getName()));
     }
+
 }

@@ -59,8 +59,11 @@ def groovydocBaseSpec = {
     link 'http://docs.oracle.com/javase/8/docs/api/', 'java.', 'org.xml.', 'javax.', 'org.w3c.'
     link 'http://docs.groovy-lang.org/docs/ant/api/', 'org.apache.ant.', 'org.apache.tools.ant.'
     link 'http://junit.org/junit4/javadoc/latest/', 'org.junit.', 'junit.'
+    link 'http://junit.org/junit5/docs/current/api/', 'org.junit.jupiter.', 'org.junit.platform.'
     link 'http://www.antlr2.org/javadoc/', 'antlr.'
+    link 'http://www.antlr.org/api/Java/', 'org.antlr.v4.'
     link 'http://commons.apache.org/proper/commons-cli/javadocs/api-release/', 'org.apache.commons.cli.'
+    link 'http://picocli.info/apidocs/', 'picocli.'
 }
 
 def groovydocSpec = groovydocBaseSpec >> {
@@ -117,18 +120,16 @@ task docProjectVersionInfo(type: Copy) {
 
 task docGDK {
     outputs.cacheIf { true }
-    dependsOn([project(':groovy-groovydoc'), project(':groovy-docgenerator')]*.classes)
-    // TODO don't hard-code these
-    dependsOn([project(':groovy-nio'), project(':groovy-sql'), project(':groovy-xml'), project(':groovy-swing')]*.classes)
+    dependsOn([project(':groovy-groovydoc'), project(':groovy-docgenerator'), project(':groovy-cli-picocli')]*.classes)
     dependsOn docProjectVersionInfo
     ext.destinationDir = "$buildDir/html/groovy-jdk"
     inputs.files sourceSets.main.runtimeClasspath + configurations.tools + files(docProjectVersionInfo.destinationDir)
     outputs.dir destinationDir
-    def docGeneratorPath = files(project(':groovy-docgenerator').sourceSets.main.output.classesDirs)
+    def docGeneratorPath = files(project(':groovy-docgenerator').sourceSets.main.output.classesDirs) + files(project(':groovy-cli-picocli').sourceSets.main.output.classesDirs)
     doLast { task ->
         try {
             ant {
-                java(classname: 'org.codehaus.groovy.tools.DocGenerator',
+                java(classname: 'org.apache.groovy.docgenerator.DocGenerator',
                      fork: 'true',
                      failonerror: 'true',
                      classpath: (sourceSets.main.runtimeClasspath + rootProject.files(docProjectVersionInfo.destinationDir) + configurations.tools + groovydocAll.groovyClasspath + docGeneratorPath).asPath,
@@ -153,9 +154,9 @@ task docGDK {
                     arg(value: 'org.codehaus.groovy.vmplugin.v8.PluginDefaultGroovyMethods')
                     // TODO don't hard-code these
                     arg(value: 'subprojects/groovy-dateutil/src/main/java/org/apache/groovy/dateutil/extensions/DateUtilExtensions.java')
-                    arg(value: 'subprojects/groovy-datetime/src/main/java/org/apache/groovy/dateutil/extensions/DateTimeExtensions.java')
-                    arg(value: 'subprojects/groovy-datetime/src/main/java/org/apache/groovy/dateutil/extensions/DateTimeStaticExtensions.java')
-                    arg(value: 'subprojects/groovy-sql/src/main/java/org/codehaus/groovy/runtime/SqlGroovyMethods.java')
+                    arg(value: 'subprojects/groovy-datetime/src/main/java/org/apache/groovy/datetime/extensions/DateTimeExtensions.java')
+                    arg(value: 'subprojects/groovy-datetime/src/main/java/org/apache/groovy/datetime/extensions/DateTimeStaticExtensions.java')
+                    arg(value: 'subprojects/groovy-sql/src/main/java/org/apache/groovy/sql/extensions/SqlExtensions.java')
                     arg(value: 'subprojects/groovy-swing/src/main/java/org/codehaus/groovy/runtime/SwingGroovyMethods.java')
                     arg(value: 'subprojects/groovy-xml/src/main/java/org/codehaus/groovy/runtime/XmlGroovyMethods.java')
                     arg(value: 'subprojects/groovy-nio/src/main/java/org/codehaus/groovy/runtime/NioGroovyMethods.java')
@@ -173,7 +174,8 @@ task docGDK {
         }
         copy {
             into task.destinationDir
-            from 'src/tools/org/codehaus/groovy/tools/groovy.ico', 'src/tools/org/codehaus/groovy/tools/stylesheet.css'
+            from 'subprojects/groovy-docgenerator/src/main/resources/org/apache/groovy/docgenerator/groovy.ico',
+                    'subprojects/groovy-docgenerator/src/main/resources/org/apache/groovy/docgenerator/stylesheet.css'
         }
     }
 }

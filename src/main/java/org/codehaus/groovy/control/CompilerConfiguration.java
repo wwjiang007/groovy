@@ -19,11 +19,6 @@
 package org.codehaus.groovy.control;
 
 import org.apache.groovy.util.Maps;
-import org.codehaus.groovy.ast.AnnotationNode;
-import org.codehaus.groovy.ast.ClassCodeVisitorSupport;
-import org.codehaus.groovy.ast.ClassHelper;
-import org.codehaus.groovy.ast.ClassNode;
-import org.codehaus.groovy.classgen.GeneratorContext;
 import org.codehaus.groovy.control.customizers.CompilationCustomizer;
 import org.codehaus.groovy.control.io.NullWriter;
 import org.codehaus.groovy.control.messages.WarningMessage;
@@ -49,7 +44,6 @@ import static org.apache.groovy.util.SystemUtil.getSystemPropertySafe;
 /**
  * Compilation control flags and coordination stuff.
  */
-
 public class CompilerConfiguration {
 
     /** This (<code>"indy"</code>) is the Optimization Option value for enabling <code>invokedynamic</code> compilation. */
@@ -87,9 +81,6 @@ public class CompilerConfiguration {
 
     /** An array of the valid targetBytecode values **/
     public static final String[] ALLOWED_JDKS = JDK_TO_BYTECODE_VERSION_MAP.keySet().toArray(new String[0]);
-
-    // Just call getVMVersion() once.
-    public static final String CURRENT_JVM_VERSION = getVMVersion();
 
     private static final String GROOVY_ANTLR4_OPT = "groovy.antlr4";
 
@@ -235,7 +226,7 @@ public class CompilerConfiguration {
         setScriptBaseClass(null);
         setRecompileGroovySource(false);
         setMinimumRecompilationInterval(100);
-        setTargetBytecode(getSystemPropertySafe("groovy.target.bytecode", getVMVersion()));
+        setTargetBytecode(getSystemPropertySafe("groovy.target.bytecode", getMinBytecodeVersion()));
         setDefaultScriptExtension(getSystemPropertySafe("groovy.default.scriptExtension", ".groovy"));
 
         // Source file encoding
@@ -377,7 +368,7 @@ public class CompilerConfiguration {
     /**
      * Checks if the specified bytecode version string represents a JDK 1.5+ compatible
      * bytecode version.
-     * @param bytecodeVersion the bytecode version string (1.4, 1.5, 1.6, 1.7 or 1.8)
+     * @param bytecodeVersion The parameter can take one of the values in {@link #ALLOWED_JDKS}.
      * @return true if the bytecode version is JDK 1.5+
      */
     public static boolean isPostJDK5(String bytecodeVersion) {
@@ -387,11 +378,31 @@ public class CompilerConfiguration {
     /**
      * Checks if the specified bytecode version string represents a JDK 1.7+ compatible
      * bytecode version.
-     * @param bytecodeVersion the bytecode version string (1.4, 1.5, 1.6, 1.7 or 1.8)
+     * @param bytecodeVersion The parameter can take one of the values in {@link #ALLOWED_JDKS}.
      * @return true if the bytecode version is JDK 1.7+
      */
     public static boolean isPostJDK7(String bytecodeVersion) {
         return new BigDecimal(bytecodeVersion).compareTo(new BigDecimal(JDK7)) >= 0;
+    }
+
+    /**
+     * Checks if the specified bytecode version string represents a JDK 1.8+ compatible
+     * bytecode version.
+     * @param bytecodeVersion The parameter can take one of the values in {@link #ALLOWED_JDKS}.
+     * @return true if the bytecode version is JDK 1.87+
+     */
+    public static boolean isPostJDK8(String bytecodeVersion) {
+        return new BigDecimal(bytecodeVersion).compareTo(new BigDecimal(JDK8)) >= 0;
+    }
+
+    /**
+     * Checks if the specified bytecode version string represents a JDK 1.8+ compatible
+     * bytecode version.
+     * @param bytecodeVersion The parameter can take one of the values in {@link #ALLOWED_JDKS}.
+     * @return true if the bytecode version is JDK 9.0+
+     */
+    public static boolean isPostJDK9(String bytecodeVersion) {
+        return new BigDecimal(bytecodeVersion).compareTo(new BigDecimal(JDK9)) >= 0;
     }
 
     /**
@@ -761,30 +772,29 @@ public class CompilerConfiguration {
     }
 
     /**
-     * Allow setting the bytecode compatibility. The parameter can take
-     * one of the values <tt>1.7</tt>, <tt>1.6</tt>, <tt>1.5</tt> or <tt>1.4</tt>.
-     * If wrong parameter then the value will default to VM determined version.
+     * Allow setting the bytecode compatibility level. The parameter can take
+     * one of the values in {@link #ALLOWED_JDKS}.
      *
-     * @param version the bytecode compatibility mode
+     * @param version the bytecode compatibility level
      */
     public void setTargetBytecode(String version) {
-        for (String allowedJdk : ALLOWED_JDKS) {
-            if (allowedJdk.equals(version)) {
-                this.targetBytecode = version;
-            }
+        if (JDK_TO_BYTECODE_VERSION_MAP.keySet().contains(version)) {
+            this.targetBytecode = version;
         }
     }
 
     /**
-     * Retrieves the compiler bytecode compatibility mode.
+     * Retrieves the compiler bytecode compatibility level.
+     * Defaults to the minimum officially supported bytecode
+     * version for any particular Groovy version.
      *
-     * @return bytecode compatibility mode. Can be either <tt>1.5</tt> or <tt>1.4</tt>.
+     * @return bytecode compatibility level
      */
     public String getTargetBytecode() {
         return this.targetBytecode;
     }
 
-    private static String getVMVersion() {
+    private static String getMinBytecodeVersion() {
         return JDK8;
     }
 
@@ -899,51 +909,55 @@ public class CompilerConfiguration {
         return indyEnabled;
     }
 
-    {
-        // this object initializer assures that `enableCompileStaticByDefault` must be invoked no matter which constructor called.
-        if (getBooleanSafe("groovy.compile.static")) {
-            enableCompileStaticByDefault();
-        }
-    }
-
-    private void enableCompileStaticByDefault() {
-        compilationCustomizers.add(
-            new CompilationCustomizer(CompilePhase.CONVERSION) {
-                @Override
-                public void call(final SourceUnit source, GeneratorContext context, ClassNode classNode) throws CompilationFailedException {
-                    for (ClassNode cn : source.getAST().getClasses()) {
-                        newClassCodeVisitor(source).visitClass(cn);
-                    }
-                }
-
-                private ClassCodeVisitorSupport newClassCodeVisitor(SourceUnit source) {
-                    return new ClassCodeVisitorSupport() {
-                        @Override
-                        public void visitClass(ClassNode node) {
-                            enableCompileStatic(node);
-                        }
-
-                        private void enableCompileStatic(ClassNode classNode) {
-                            if (!classNode.getAnnotations(ClassHelper.make(GROOVY_TRANSFORM_COMPILE_STATIC)).isEmpty()) {
-                                return;
-                            }
-                            if (!classNode.getAnnotations(ClassHelper.make(GROOVY_TRANSFORM_COMPILE_DYNAMIC)).isEmpty()) {
-                                return;
-                            }
-
-                            classNode.addAnnotation(new AnnotationNode(ClassHelper.make(GROOVY_TRANSFORM_COMPILE_STATIC)));
-                        }
-
-                        @Override
-                        protected SourceUnit getSourceUnit() {
-                            return source;
-                        }
-
-                        private static final String GROOVY_TRANSFORM_COMPILE_STATIC = "groovy.transform.CompileStatic";
-                        private static final String GROOVY_TRANSFORM_COMPILE_DYNAMIC = "groovy.transform.CompileDynamic";
-                    };
-                }
-            }
-        );
-    }
+//       See http://groovy.329449.n5.nabble.com/What-the-static-compile-by-default-tt5750118.html
+//           https://issues.apache.org/jira/browse/GROOVY-8543
+//
+//    {
+//        // this object initializer assures that `enableCompileStaticByDefault` must be invoked no matter which constructor called.
+//        if (getBooleanSafe("groovy.compile.static")) {
+//            enableCompileStaticByDefault();
+//        }
+//    }
+//
+//
+//    private void enableCompileStaticByDefault() {
+//        compilationCustomizers.add(
+//            new CompilationCustomizer(CompilePhase.CONVERSION) {
+//                @Override
+//                public void call(final SourceUnit source, GeneratorContext context, ClassNode classNode) throws CompilationFailedException {
+//                    for (ClassNode cn : source.getAST().getClasses()) {
+//                        newClassCodeVisitor(source).visitClass(cn);
+//                    }
+//                }
+//
+//                private ClassCodeVisitorSupport newClassCodeVisitor(SourceUnit source) {
+//                    return new ClassCodeVisitorSupport() {
+//                        @Override
+//                        public void visitClass(ClassNode node) {
+//                            enableCompileStatic(node);
+//                        }
+//
+//                        private void enableCompileStatic(ClassNode classNode) {
+//                            if (!classNode.getAnnotations(ClassHelper.make(GROOVY_TRANSFORM_COMPILE_STATIC)).isEmpty()) {
+//                                return;
+//                            }
+//                            if (!classNode.getAnnotations(ClassHelper.make(GROOVY_TRANSFORM_COMPILE_DYNAMIC)).isEmpty()) {
+//                                return;
+//                            }
+//
+//                            classNode.addAnnotation(new AnnotationNode(ClassHelper.make(GROOVY_TRANSFORM_COMPILE_STATIC)));
+//                        }
+//
+//                        @Override
+//                        protected SourceUnit getSourceUnit() {
+//                            return source;
+//                        }
+//
+//                        private static final String GROOVY_TRANSFORM_COMPILE_STATIC = "groovy.transform.CompileStatic";
+//                        private static final String GROOVY_TRANSFORM_COMPILE_DYNAMIC = "groovy.transform.CompileDynamic";
+//                    };
+//                }
+//            }
+//        );
+//    }
 }

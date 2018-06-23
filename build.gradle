@@ -50,14 +50,13 @@ buildscript {
 }
 
 plugins {
-    id 'com.gradle.build-scan' version '1.12.1'
+    id 'com.gradle.build-scan' version '1.13.4'
     id 'me.champeau.buildscan-recipes' version '0.2.3'
 }
 
 buildScan {
     licenseAgreementUrl = 'https://gradle.com/terms-of-service'
-    licenseAgree = 'yes'
-    publishAlways()
+    apply from: 'gradle/build-scans.gradle'
 }
 
 buildScanRecipes {
@@ -144,7 +143,7 @@ configurations {
 
 ext {
     antVersion = '1.10.3'
-    asmVersion = '6.1.1'
+    asmVersion = '6.2'
     antlrVersion = '2.7.7'
     bridgerVersion = '1.1.Final'
     coberturaVersion = '1.9.4.1'
@@ -152,7 +151,7 @@ ext {
     commonsHttpClientVersion = '3.1'
     eclipseOsgiVersion = '3.9.1-v20140110-1610'
     gparsVersion = '1.2.1'
-    ivyVersion = '2.4.0'
+    ivyVersion = '2.5.0-rc1'
     jansiVersion = '1.17.1'
     jarjarVersion = '1.6.5'
     jlineVersion = '2.14.6'
@@ -163,6 +162,7 @@ ext {
     luceneVersion = '4.7.2'
     openbeansVersion = '1.0'
     openejbVersion = '1.0'
+    picocliVersion = '3.0.2'
     qdoxVersion = '1.12.1'
     slf4jVersion = '1.7.21'
     xmlunitVersion = '1.6'
@@ -180,7 +180,7 @@ dependencies {
     compile "org.ow2.asm:asm-tree:$asmVersion"
     compile "org.ow2.asm:asm-util:$asmVersion"
 
-    compile "commons-cli:commons-cli:$commonsCliVersion"
+    compile "info.picocli:picocli:$picocliVersion"
     compile "org.apache.ant:ant:$antVersion"
     compile("com.thoughtworks.xstream:xstream:$xstreamVersion") {
         exclude(group: 'xpp3', module: 'xpp3_min')

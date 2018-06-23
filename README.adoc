@@ -155,7 +155,7 @@ Then open the generated project and the generated subprojects in Eclipse. But be
 
 To build the documentation (Groovy Language Documentation):
 
-    gradlew assembleAsciidoc
+    gradlew asciidoc
 
 All code samples of the documentation guide are pulled from actual test cases. To run a single documentation test case, take for example `src/spec/test/semantics/PowerAssertTest.groovy`
 
@@ -178,6 +178,10 @@ Please note that the following Gradle tasks generate both indy and non indy vari
 == Continuous Integration Server
 
 The official CI server runs {groovy-ci}[here] and is sponsored by http://www.jetbrains.com[JetBrains].
+
+== Java Profiler
+
+Groovy core team tunes performance through YourKit Java Profiler, which is sponsored by https://www.yourkit.com[YourKit].
 
 == License
 

@@ -20,6 +20,7 @@
 package org.codehaus.groovy.transform.stc;
 
 import org.codehaus.groovy.GroovyBugError;
+import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
@@ -72,6 +73,7 @@ import java.util.UUID;
 import java.util.WeakHashMap;
 import java.util.regex.Matcher;
 
+import static java.lang.Math.min;
 import static org.codehaus.groovy.ast.ClassHelper.BigDecimal_TYPE;
 import static org.codehaus.groovy.ast.ClassHelper.BigInteger_TYPE;
 import static org.codehaus.groovy.ast.ClassHelper.Boolean_TYPE;
@@ -441,7 +443,7 @@ public abstract class StaticTypeCheckingSupport {
         ClassNode ptype = lastParamType.getComponentType();
         ClassNode arg = args[args.length - 1];
         if (isNumberType(ptype) && isNumberType(arg) && !ptype.equals(arg)) return -1;
-        return isAssignableTo(arg, ptype) ? Math.min(getDistance(arg, lastParamType), getDistance(arg, ptype)) : -1;
+        return isAssignableTo(arg, ptype) ? min(getDistance(arg, lastParamType), getDistance(arg, ptype)) : -1;
     }
 
     /**
@@ -955,7 +957,7 @@ public abstract class StaticTypeCheckingSupport {
             return dist;
         }
 
-        ClassNode ref = receiver;
+        ClassNode ref = isPrimitiveType(receiver) && !isPrimitiveType(compare) ? ClassHelper.getWrapper(receiver) : receiver;
         while (ref != null) {
             if (compare.equals(ref)) {
                 break;
@@ -1097,7 +1099,8 @@ public abstract class StaticTypeCheckingSupport {
                 Person p = foo(b)
              */
 
-            Parameter[] params = makeRawTypes(safeNode.getParameters());
+            Map<GenericsType, GenericsType> declaringAndActualGenericsTypeMap = GenericsUtils.makeDeclaringAndActualGenericsTypeMap(declaringClassForDistance, actualReceiverForDistance);
+            Parameter[] params = makeRawTypes(safeNode.getParameters(), declaringAndActualGenericsTypeMap);
             int dist = measureParametersAndArgumentsDistance(params, safeArgs);
             if (dist >= 0) {
                 dist += getClassDistance(declaringClassForDistance, actualReceiverForDistance);
@@ -1187,11 +1190,14 @@ public abstract class StaticTypeCheckingSupport {
         return isExtensionMethodNode ? 0 : 1;
     }
 
-    private static Parameter[] makeRawTypes(Parameter[] params) {
+    private static Parameter[] makeRawTypes(Parameter[] params, Map<GenericsType, GenericsType> genericsPlaceholderAndTypeMap) {
+
         Parameter[] newParam = new Parameter[params.length];
         for (int i = 0; i < params.length; i++) {
             Parameter oldP = params[i];
-            Parameter newP = new Parameter(makeRawType(oldP.getType()), oldP.getName());
+
+            ClassNode actualType = GenericsUtils.findActualTypeByGenericsPlaceholderName(oldP.getType().getUnresolvedName(), genericsPlaceholderAndTypeMap);
+            Parameter newP = new Parameter(makeRawType(null == actualType ? oldP.getType() : actualType), oldP.getName());
             newParam[i] = newP;
         }
         return newParam;
@@ -1522,7 +1528,7 @@ public abstract class StaticTypeCheckingSupport {
         Set<String> fixedGenericsPlaceHolders = extractResolvedPlaceHolders(resolvedMethodGenerics);
 
         for (int i = 0; i < arguments.length; i++) {
-            int pindex = Math.min(i, parameters.length - 1);
+            int pindex = min(i, parameters.length - 1);
             ClassNode wrappedArgument = arguments[i];
             ClassNode type = parameters[pindex].getOriginType();
 

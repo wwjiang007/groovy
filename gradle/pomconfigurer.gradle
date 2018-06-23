@@ -444,6 +444,9 @@ project.ext.pomConfigureClosureWithoutTweaks = {
                 name 'Bernhard Huber'
             }
             contributor {
+                name 'Yasuharu Nakano'
+            }
+            contributor {
                 name 'Marc DeXeT'
             }
             contributor {
@@ -623,6 +626,12 @@ project.ext.pomConfigureClosureWithoutTweaks = {
             }
             contributor {
                 name 'Tom Nichols'
+            }
+            contributor {
+                name 'Remko Popma'
+            }
+            contributor {
+                name 'mgroovy'
             }
         }
         mailingLists {

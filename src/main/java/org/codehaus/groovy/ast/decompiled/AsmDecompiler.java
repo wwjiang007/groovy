@@ -20,6 +20,7 @@ package org.codehaus.groovy.ast.decompiled;
 
 import groovy.lang.GroovyRuntimeException;
 import org.codehaus.groovy.control.CompilerConfiguration;
+import org.codehaus.groovy.util.URLStreams;
 import org.objectweb.asm.AnnotationVisitor;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassVisitor;
@@ -78,7 +79,7 @@ public abstract class AsmDecompiler {
         if (stub == null) {
             DecompilingVisitor visitor = new DecompilingVisitor();
 
-            try (InputStream stream = new BufferedInputStream(url.openStream())) {
+            try (InputStream stream = new BufferedInputStream(URLStreams.openUncachedStream(url))) {
                 new ClassReader(stream).accept(visitor, ClassReader.SKIP_FRAMES);
             }
             stub = visitor.result;
@@ -102,7 +103,28 @@ public abstract class AsmDecompiler {
 
         @Override
         public void visitInnerClass(String name, String outerName, String innerName, int access) {
-            result.innerClassModifiers.put(innerName, access);
+            /*
+             * Class files generated for inner classes have an INNERCLASS
+             * reference to self. The top level class access modifiers for
+             * an inner class will not accurately reflect their access. For
+             * example, top-level access modifiers for private inner classes
+             * are package-private, protected inner classes are public, and
+             * the static modifier is not included. So the INNERCLASS self
+             * reference is used to capture the correct modifiers.
+             *
+             * Must compare against the fully qualified name because there may
+             * be other INNERCLASS references to same named nested classes from
+             * other classes.
+             *
+             * Example:
+             *
+             *   public final class org/foo/Groovy8632$Builder extends org/foo/Groovy8632Abstract$Builder  {
+             *     public final static INNERCLASS org/foo/Groovy8632$Builder org/foo/Groovy8632 Builder
+             *     public static abstract INNERCLASS org/foo/Groovy8632Abstract$Builder org/foo/Groovy8632Abstract Builder
+             */
+            if (fromInternalName(name).equals(result.className)) {
+                result.innerClassModifiers = access;
+            }
         }
 
         @Override

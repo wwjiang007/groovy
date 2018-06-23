@@ -206,7 +206,7 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
 //            DateUtilExtensions.class,
 //            DateTimeStaticExtensions.class,
 //            DateTimeExtensions.class,
-//            SqlGroovyMethods.class,
+//            SqlExtensions.class,
 //            SwingGroovyMethods.class,
 //            XmlGroovyMethods.class,
 //            NioGroovyMethods.class
@@ -3241,6 +3241,19 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
     }
 
     /**
+     * Collates an array.
+     *
+     * @param self          an array
+     * @param size          the length of each sub-list in the returned list
+     * @return a List containing the array values collated into sub-lists
+     * @see #collate(Iterable, int)
+     * @since 2.5.0
+     */
+    public static <T> List<List<T>> collate(T[] self, int size) {
+        return collate((Iterable)Arrays.asList(self), size, true);
+    }
+
+    /**
      * @deprecated use the Iterable variant instead
      * @see #collate(Iterable, int)
      * @since 1.8.6
@@ -3269,6 +3282,20 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
     }
 
     /**
+     * Collates an array into sub-lists.
+     *
+     * @param self          an array
+     * @param size          the length of each sub-list in the returned list
+     * @param step          the number of elements to step through for each sub-list
+     * @return a List containing the array elements collated into sub-lists
+     * @see #collate(Iterable, int, int)
+     * @since 2.5.0
+     */
+    public static <T> List<List<T>> collate(T[] self, int size, int step) {
+        return collate((Iterable)Arrays.asList(self), size, step, true);
+    }
+
+    /**
      * @deprecated use the Iterable variant instead
      * @see #collate(Iterable, int, int)
      * @since 1.8.6
@@ -3294,6 +3321,20 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
      */
     public static <T> List<List<T>> collate(Iterable<T> self, int size, boolean keepRemainder) {
         return collate(self, size, size, keepRemainder);
+    }
+
+    /**
+     * Collates this array into sub-lists.
+     *
+     * @param self          an array
+     * @param size          the length of each sub-list in the returned list
+     * @param keepRemainder if true, any remaining elements are returned as sub-lists.  Otherwise they are discarded
+     * @return a List containing the array elements collated into sub-lists
+     * @see #collate(Iterable, int, boolean)
+     * @since 2.5.0
+     */
+    public static <T> List<List<T>> collate(T[] self, int size, boolean keepRemainder) {
+        return collate((Iterable)Arrays.asList(self), size, size, keepRemainder);
     }
 
     /**
@@ -3345,6 +3386,20 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
             }
         }
         return answer ;
+    }
+
+    /**
+     * Collates this array into into sub-lists.
+     *
+     * @param self          an array
+     * @param size          the length of each sub-list in the returned list
+     * @param step          the number of elements to step through for each sub-list
+     * @param keepRemainder if true, any remaining elements are returned as sub-lists.  Otherwise they are discarded
+     * @return a List containing the array elements collated into sub-lists
+     * @since 2.5.0
+     */
+    public static <T> List<List<T>> collate(T[] self, int size, int step, boolean keepRemainder) {
+        return collate((Iterable)Arrays.asList(self), size, step, keepRemainder);
     }
 
     /**
@@ -3444,7 +3499,7 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
      * @return a List of the transformed values
      * @since 2.5.0
      */
-    public static <S,T> List<T> collect(Iterator<S> self, @ClosureParams(FirstParam.Component.class) Closure<T> transform) {
+    public static <S,T> List<T> collect(Iterator<S> self, @ClosureParams(FirstParam.FirstGenericType.class) Closure<T> transform) {
         return (List<T>) collect(self, new ArrayList<T>(), transform);
     }
 
@@ -10238,8 +10293,11 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
             return createSimilarMap(self);
         }
         Map<K, V> ret = createSimilarMap(self);
-        for (K key : self.keySet()) {
-            ret.put(key, self.get(key));
+        for (Map.Entry<K, V> entry : self.entrySet()) {
+            K key = entry.getKey();
+            V value = entry.getValue();
+
+            ret.put(key, value);
             if (--num <= 0) {
                 break;
             }
@@ -10533,9 +10591,12 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
             return cloneSimilarMap(self);
         }
         Map<K, V> ret = createSimilarMap(self);
-        for (K key : self.keySet()) {
+        for (Map.Entry<K, V> entry : self.entrySet()) {
+            K key = entry.getKey();
+            V value = entry.getValue();
+
             if (num-- <= 0) {
-                ret.put(key, self.get(key));
+                ret.put(key, value);
             }
         }
         return ret;
@@ -12689,8 +12750,12 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
         if (!self.keySet().equals(other.keySet())) {
             return false;
         }
-        for (Object key : self.keySet()) {
-            if (!coercedEquals(self.get(key), other.get(key))) {
+        for (Object o : self.entrySet()) {
+            Map.Entry entry = (Map.Entry) o;
+            Object key = entry.getKey();
+            Object value = entry.getValue();
+
+            if (!coercedEquals(value, other.get(key))) {
                 return false;
             }
         }

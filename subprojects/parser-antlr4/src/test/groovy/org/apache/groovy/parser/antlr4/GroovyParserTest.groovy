@@ -266,6 +266,7 @@ class GroovyParserTest extends GroovyTestCase {
 
     void "test groovy core - TryWithResources"() {
         doRunAndTestAntlr4('core/TryWithResources_01x.groovy')
+        doRunAndTestAntlr4('core/TryWithResources_02x.groovy')
     }
 
     void "test groovy core - SafeIndex"() {
@@ -427,5 +428,6 @@ class GroovyParserTest extends GroovyTestCase {
         doRunAndTestAntlr4('bugs/BUG-GROOVY-8311.groovy')
         doRunAndTest('bugs/BUG-GROOVY-8426.groovy')
         doTest('bugs/BUG-GROOVY-8511.groovy');
+        doRunAndTestAntlr4('bugs/BUG-GROOVY-8613.groovy')
     }
 }

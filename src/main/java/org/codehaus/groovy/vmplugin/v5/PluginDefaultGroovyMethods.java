@@ -19,6 +19,7 @@
 package org.codehaus.groovy.vmplugin.v5;
 
 import groovy.lang.EmptyRange;
+import groovy.lang.GString;
 import groovy.lang.IntRange;
 import org.codehaus.groovy.runtime.DefaultGroovyMethodsSupport;
 import org.codehaus.groovy.runtime.InvokerHelper;
@@ -45,8 +46,7 @@ public class PluginDefaultGroovyMethods extends DefaultGroovyMethodsSupport {
      */
     public static Object next(Enum self) {
         final Method[] methods = self.getClass().getMethods();
-        for (int i = 0; i < methods.length; i++) {
-            Method method = methods[i];
+        for (Method method : methods) {
             if (method.getName().equals("next") && method.getParameterTypes().length == 0) {
                 return InvokerHelper.invokeMethod(self, "next", NO_ARGS);
             }
@@ -66,8 +66,7 @@ public class PluginDefaultGroovyMethods extends DefaultGroovyMethodsSupport {
      */
     public static Object previous(Enum self) {
         final Method[] methods = self.getClass().getMethods();
-        for (int i = 0; i < methods.length; i++) {
-            Method method = methods[i];
+        for (Method method : methods) {
             if (method.getName().equals("previous") && method.getParameterTypes().length == 0) {
                 return InvokerHelper.invokeMethod(self, "previous", NO_ARGS);
             }
@@ -96,10 +95,16 @@ public class PluginDefaultGroovyMethods extends DefaultGroovyMethodsSupport {
      * @return the StringBuilder on which this operation was invoked
      */
     public static StringBuilder leftShift(StringBuilder self, Object value) {
-        if (value instanceof CharSequence)
+        if (value instanceof GString) {
+            // Force the conversion of the GString to string now, or appending
+            // is going to be extremely expensive, due to calls to GString#charAt,
+            // which is going to re-evaluate the GString for each character!
+            return self.append(value.toString());
+        }
+        if (value instanceof CharSequence) {
             return self.append((CharSequence)value);
-        else
-            return self.append(value);
+        }
+        return self.append(value);
     }
 
     /**

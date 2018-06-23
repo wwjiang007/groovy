@@ -18,6 +18,8 @@
  */
 package groovy.ui
 
+import groovy.cli.picocli.CliBuilder
+import groovy.cli.picocli.OptionAccessor
 import groovy.inspect.swingui.AstBrowser
 import groovy.inspect.swingui.ObjectBrowser
 import groovy.swing.SwingBuilder
@@ -191,16 +193,16 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
     ConsolePreferences consolePreferences
 
     static void main(args) {
-        CliBuilder cli = new CliBuilder(usage: 'groovyConsole [options] [filename]', stopAtNonOption: false)
         MessageSource messages = new MessageSource(Console)
+        CliBuilder cli = new CliBuilder(usage: 'groovyConsole [options] [filename]', stopAtNonOption: false,
+                header: messages['cli.option.header'])
         cli.with {
-            classpath(messages['cli.option.classpath.description'])
-            cp(longOpt: 'classpath', messages['cli.option.cp.description'])
+            _(names: ['-cp', '-classpath', '--classpath'], messages['cli.option.classpath.description'])
             h(longOpt: 'help', messages['cli.option.help.description'])
             V(longOpt: 'version', messages['cli.option.version.description'])
             pa(longOpt: 'parameters', messages['cli.option.parameters.description'])
             i(longOpt: 'indy', messages['cli.option.indy.description'])
-            D(longOpt: 'define', args: 2, argName: 'name=value', valueSeparator: '=', messages['cli.option.define.description'])
+            D(longOpt: 'define', type: Map, argName: 'name=value', messages['cli.option.define.description'])
             _(longOpt: 'configscript', args: 1, messages['cli.option.configscript.description'])
         }
         OptionAccessor options = cli.parse(args)
@@ -221,9 +223,7 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         }
 
         if (options.hasOption('D')) {
-            options.getOptionProperties('D')?.each { k, v ->
-                System.setProperty(k, v)
-            }
+            options.Ds.each { k, v -> System.setProperty(k, v) }
         }
 
         // full stack trace should not be logged to the output window - GROOVY-4663
@@ -1068,6 +1068,36 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
         }
     }
 
+    void listClasspath(EventObject evt = null) {
+        List<URL> urls = []
+
+        ClassLoader cl = shell.classLoader
+        while(cl instanceof URLClassLoader) {
+            cl.getURLs().each { url -> urls << url }
+            cl = cl.parent
+        }
+
+        boolean isWin = isWindows()
+        List data = urls.unique().collect { url -> [name: new File(url.toURI()).name, path: isWin ? url.path.substring(1).replace('/', '\\') : url.path] }
+        data.sort { it.name.toLowerCase() }
+
+        JScrollPane scrollPane = swing.scrollPane{
+            table {
+                tableModel(list : data) {
+                    propertyColumn(header: 'Name', propertyName: 'name', editable: false)
+                    propertyColumn(header:' Path', propertyName: 'path', editable: false)
+                }
+            }
+        }
+
+        def pane = swing.optionPane()
+        pane.message = scrollPane
+        def dialog = pane.createDialog(frame, 'Classpath')
+        dialog.setSize(800, 600)
+        dialog.resizable = true
+        dialog.visible = true
+    }
+
     void clearContext(EventObject evt = null) {
         def binding = new Binding()
         newScript(null, binding)
@@ -1545,6 +1575,13 @@ class Console implements CaretListener, HyperlinkListener, ComponentListener, Fo
     }
 
     public void focusLost(FocusEvent e) { }
+
+    private static boolean isWindows() {
+        return getOsName().startsWith("windows")
+    }
+    private static String getOsName() {
+        return System.getProperty("os.name").toLowerCase()
+    }
 }
 
 class GroovyFileFilter extends FileFilter {

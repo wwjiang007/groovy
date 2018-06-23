@@ -50,7 +50,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         shouldFailWithMessages '''
             List<String> list = []
             list.add(1)
-        ''', "Cannot call java.util.List <String>#add(java.lang.String) with arguments [int]"
+        ''', "[Static type checking] - Cannot find matching method java.util.List#add(int)"
     }
 
     void testAddOnList2() {
@@ -76,7 +76,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         shouldFailWithMessages '''
             List<String> list = []
             list << 1
-        ''', 'Cannot call <T> java.util.List <String>#leftShift(T) with arguments [int]'
+        ''', '[Static type checking] - Cannot find matching method java.util.List#leftShift(int)'
     }
 
     void testAddOnList2UsingLeftShift() {
@@ -88,6 +88,14 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         assertScript '''
             List<Integer> list = []
             list << 1
+        '''
+    }
+
+    void testAddOnListWithParameterizedTypeLeftShift() {
+        assertScript '''
+            class Trie<T> {}
+            List<Trie<String>> list = []
+            list << new Trie<String>()
         '''
     }
 
@@ -116,14 +124,14 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         shouldFailWithMessages '''
             List<Integer> list = new LinkedList<>()
             list.add 'Hello'
-        ''', 'Cannot call java.util.LinkedList <java.lang.Integer>#add(java.lang.Integer) with arguments [java.lang.String]'
+        ''', '[Static type checking] - Cannot call java.util.LinkedList <java.lang.Integer>#add(java.lang.Integer) with arguments [java.lang.String]'
     }
 
     void testAddOnListWithDiamondAndWrongTypeUsingLeftShift() {
         shouldFailWithMessages '''
             List<Integer> list = new LinkedList<>()
             list << 'Hello'
-        ''', 'Cannot call <T> java.util.LinkedList <java.lang.Integer>#leftShift(T) with arguments [java.lang.String]'
+        ''', '[Static type checking] - Cannot call <T> java.util.LinkedList <java.lang.Integer>#leftShift(T) with arguments [java.lang.String]'
     }
 
     void testAddOnListWithDiamondAndNullUsingLeftShift() {
@@ -424,7 +432,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         shouldFailWithMessages '''
             Map<String, Integer> map = new HashMap<String,Integer>()
             map.put('hello', new Object())
-        ''', 'Cannot call java.util.HashMap <String, Integer>#put(java.lang.String, java.lang.Integer) with arguments [java.lang.String, java.lang.Object]'
+        ''', '[Static type checking] - Cannot call java.util.HashMap <String, Integer>#put(java.lang.String, java.lang.Integer) with arguments [java.lang.String, java.lang.Object]'
     }
 
     void testPutMethodWithPrimitiveValueAndArrayPut() {
@@ -749,7 +757,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             })
             Map<Date, Date> map = new HashMap<>()
             map.put('foo', new Date())
-        ''', 'Cannot call java.util.HashMap <java.util.Date, java.util.Date>#put(java.util.Date, java.util.Date) with arguments [java.lang.String, java.util.Date]'
+        ''', '[Static type checking] - Cannot call java.util.HashMap <java.util.Date, java.util.Date>#put(java.util.Date, java.util.Date) with arguments [java.lang.String, java.util.Date]'
     }
     void testInferDiamondForAssignmentWithDatesAndIllegalKeyUsingSquareBracket() {
         shouldFailWithMessages '''
@@ -787,7 +795,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             })
             Map<Date, Date> map = new HashMap<>()
             map.put(new Date(), 'foo')
-        ''', 'Cannot call java.util.HashMap <java.util.Date, java.util.Date>#put(java.util.Date, java.util.Date) with arguments [java.util.Date, java.lang.String]'
+        ''', '[Static type checking] - Cannot call java.util.HashMap <java.util.Date, java.util.Date>#put(java.util.Date, java.util.Date) with arguments [java.util.Date, java.lang.String]'
     }
     void testInferDiamondForAssignmentWithDatesAndIllegalValueUsingSquareBracket() {
         shouldFailWithMessages '''
@@ -1092,7 +1100,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
                 }
             }
             Baz.qux([new Object()])
-        ''', 'Cannot call <T extends java.util.List<? extends java.lang.CharSequence>> Foo#bar(T) with arguments [T]'
+        ''', 'Cannot call <T extends java.util.List<? extends java.lang.CharSequence>> Foo#bar(T) with arguments [java.util.List <Object>]'
     }
 
     void testOutOfBoundsBySuperPlaceholderParameterType() {
@@ -1106,7 +1114,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
                 }
             }
             Baz.qux(['abc'])
-        ''', 'Cannot call <T extends java.util.List<? super java.lang.CharSequence>> Foo#bar(T) with arguments [T]'
+        ''', 'Cannot call <T extends java.util.List<? super java.lang.CharSequence>> Foo#bar(T) with arguments [java.util.List <String>] '
     }
 
     // GROOVY-5721
@@ -1306,7 +1314,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
                 Foo<Map> f = new Foo<Map>("a",1)
             }
             bar()
-        ''', '[Static type checking] - Cannot call Foo <Map>#<init>(java.util.Map, java.util.Map) with arguments [java.lang.String, int]'
+        ''', '[Static type checking] - Cannot find matching method Foo#<init>(java.lang.String, int)'
     }
     
     // Groovy-5742
@@ -1791,29 +1799,6 @@ assert result == 'ok'
         '''
     }
 
-    // GROOVY-7691
-    @NotYetImplemented
-    void testCovariantGenericField() {
-        assertScript '''
-            abstract class AbstractNumberWrapper<S extends Number> {
-                protected final S number;
-
-                AbstractNumberWrapper(S number) {
-                    this.number = number
-                }
-            }
-            class LongWrapper<S extends Long> extends AbstractNumberWrapper<S> {
-                LongWrapper(S longNumber) {
-                    super(longNumber)
-                }
-
-                S getValue() {
-                    return number;
-                }
-            }
-            assert new LongWrapper<Long>(42L).value == 42L
-        '''
-    }
 
     //GROOVY-7804
     void testParameterlessClosureToGenericSAMTypeArgumentCoercion() {
