@@ -768,14 +768,8 @@ enhancedStatementExpression
     |   standardLambdaExpression
     ;
 
-/**
- *  In order to resolve the syntactic ambiguities, e.g. (String)'abc' can be parsed as a cast expression or a parentheses-less method call(method name: (String), arguments: 'abc')
- *      try to match expression first.
- *  If it is not a normal expression, then try to match the command expression
- */
 statementExpression
-    :   expression                          #normalExprAlt
-    |   commandExpression                   #commandExprAlt
+    :   commandExpression                   #commandExprAlt
     ;
 
 postfixExpression
@@ -886,9 +880,9 @@ enhancedExpression
 */
 
 commandExpression
-    :   pathExpression
+    :   expression
         (
-            { SemanticPredicates.isFollowingMethodName($pathExpression.t) }?
+            { !SemanticPredicates.isFollowingArgumentsOrClosure($expression.ctx) }?
             argumentList
         |
             /* if pathExpression is a method call, no need to have any more arguments */
@@ -951,7 +945,7 @@ pathElement returns [int t]
         namePart
         { $t = 1; }
     |
-        DOT nls NEW creator[1]
+        nls DOT nls NEW creator[1]
         { $t = 6; }
     |   arguments
         { $t = 2; }
@@ -1013,7 +1007,7 @@ indexPropertyArgs
     ;
 
 namedPropertyArgs
-    :   LBRACK mapEntryList RBRACK
+    :   QUESTION? LBRACK (mapEntryList | COLON) RBRACK
     ;
 
 primary
@@ -1145,6 +1139,10 @@ identifier
         // if 'static' followed by DOT, we can treat them as identifiers, e.g. static.unused = { -> }
         { DOT == _input.LT(2).getType() }?
         STATIC
+    |   IN
+//    |   DEF
+    |   TRAIT
+    |   AS
     ;
 
 builtInType

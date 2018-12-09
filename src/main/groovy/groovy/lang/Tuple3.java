@@ -24,48 +24,49 @@ package groovy.lang;
  *
  * @since 2.5.0
  */
-public class Tuple3<T1, T2, T3> extends Tuple {
+public final class Tuple3<T1, T2, T3> extends Tuple {
     private static final long serialVersionUID = 8469774237154310687L;
-    private final T1 first;
-    private final T2 second;
-    private final T3 third;
+    private final T1 v1;
+    private final T2 v2;
+    private final T3 v3;
 
-    public Tuple3(T1 first, T2 second, T3 third) {
-        super(first, second, third);
+    public Tuple3(T1 v1, T2 v2, T3 v3) {
+        super(v1, v2, v3);
 
-        this.first = first;
-        this.second = second;
-        this.third = third;
+        this.v1 = v1;
+        this.v2 = v2;
+        this.v3 = v3;
     }
 
-    @Override
-    public Object get(int index) {
-        switch (index) {
-            case 0:
-                return first;
-            case 1:
-                return second;
-            case 2:
-                return third;
-            default:
-                throw new IndexOutOfBoundsException("index: " + index);
-        }
+    public Tuple3(Tuple3<T1, T2, T3> tuple) {
+        this(tuple.v1, tuple.v2, tuple.v3);
     }
 
-    @Override
-    public int size() {
-        return 3;
-    }
-
+    @Deprecated
     public T1 getFirst() {
-        return first;
+        return v1;
     }
 
+    @Deprecated
     public T2 getSecond() {
-        return second;
+        return v2;
     }
 
+    @Deprecated
     public T3 getThird() {
-        return third;
+        return v3;
     }
+
+    public T1 getV1() {
+        return v1;
+    }
+
+    public T2 getV2() {
+        return v2;
+    }
+
+    public T3 getV3() {
+        return v3;
+    }
+
 }

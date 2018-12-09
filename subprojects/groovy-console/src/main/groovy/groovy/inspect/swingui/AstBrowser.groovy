@@ -20,6 +20,7 @@ package groovy.inspect.swingui
 
 import groovy.lang.GroovyClassLoader.ClassCollector
 import groovy.swing.SwingBuilder
+import groovy.transform.CompileStatic
 import org.apache.groovy.io.StringBuilderWriter
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.control.CompilationUnit
@@ -94,6 +95,11 @@ class AstBrowser {
         }
     }
 
+    void initAuxViews() {
+        bytecodeView.textEditor.text = BYTECODE_MSG_SELECT_NODE
+        asmifierView.textEditor.text = BYTECODE_MSG_SELECT_NODE
+    }
+
     void run(Closure script) {
         run(script, null)
     }
@@ -146,6 +152,7 @@ class AstBrowser {
                         refreshAction = action(name: 'Refresh', closure: {
                             decompile(phasePicker.selectedItem.phaseId, script())
                             compile(jTree, script(), phasePicker.selectedItem.phaseId)
+                            initAuxViews()
                         }, mnemonic: 'R', accelerator: KeyStroke.getKeyStroke(KeyEvent.VK_F5, 0))
                     }
                 }
@@ -161,8 +168,7 @@ class AstBrowser {
                         selectedItem: prefs.selectedPhase,
                         actionPerformed: {
                             // reset text to the default as the phase change removes the focus from the class node
-                            bytecodeView.textEditor.text = BYTECODE_MSG_SELECT_NODE
-                            asmifierView.textEditor.text = BYTECODE_MSG_SELECT_NODE
+                            initAuxViews()
 
                             decompile(phasePicker.selectedItem.phaseId, script())
                             compile(jTree, script(), phasePicker.selectedItem.phaseId)
@@ -172,6 +178,7 @@ class AstBrowser {
                         actionPerformed: {
                             decompile(phasePicker.selectedItem.phaseId, script())
                             compile(jTree, script(), phasePicker.selectedItem.phaseId)
+                            initAuxViews()
                         },
                         constraints: gbc(gridx: 2, gridy: 0, gridwidth: 1, gridheight: 1, weightx: 0, weighty: 0, anchor: NORTHEAST, fill: NONE, insets: [2, 2, 2, 3]))
                 splitterPane = splitPane(
@@ -204,8 +211,7 @@ class AstBrowser {
             }
         }
 
-        bytecodeView.textEditor.text = BYTECODE_MSG_SELECT_NODE
-        asmifierView.textEditor.text = BYTECODE_MSG_SELECT_NODE
+        initAuxViews()
 
         propertyTable.model.rows.clear() //for some reason this suppress an empty row
 
@@ -410,8 +416,7 @@ class AstBrowser {
 
     void showIndyBytecode(EventObject evt = null) {
         showIndyBytecode = evt.source.selected
-        bytecodeView.textEditor.text = BYTECODE_MSG_SELECT_NODE
-        asmifierView.textEditor.text = BYTECODE_MSG_SELECT_NODE
+        initAuxViews()
         refreshAction.actionPerformed(null)
         updateTabTitles()
     }
@@ -509,7 +514,7 @@ class AstBrowserUiPreferences {
     int decompiledSourceFontSize
     final CompilePhaseAdapter selectedPhase
 
-    def AstBrowserUiPreferences() {
+    AstBrowserUiPreferences() {
         Preferences prefs = Preferences.userNodeForPackage(AstBrowserUiPreferences)
         frameLocation = [
                 prefs.getInt('frameX', 200),
@@ -532,7 +537,7 @@ class AstBrowserUiPreferences {
         }
     }
 
-    def save(frame, vSplitter, hSplitter, scriptFreeFormPref, scriptClassPref, closureClassesPref, CompilePhaseAdapter phase, showTreeView, showIndyBytecode) {
+    def save(frame, vSplitter, hSplitter, scriptFreeFormPref, scriptClassPref, closureClassesPref, CompilePhaseAdapter phase, showTreeView, showIndyBytecode=false) {
         Preferences prefs = Preferences.userNodeForPackage(AstBrowserUiPreferences)
         prefs.putInt('decompiledFontSize', decompiledSourceFontSize as int)
         prefs.putInt('frameX', frame.location.x as int)
@@ -553,6 +558,7 @@ class AstBrowserUiPreferences {
 /**
  * An adapter for the CompilePhase enum that can be entered into a Swing combobox.
  */
+@CompileStatic
 enum CompilePhaseAdapter {
     INITIALIZATION(Phases.INITIALIZATION, 'Initialization'),
     PARSING(Phases.PARSING, 'Parsing'),
@@ -567,12 +573,12 @@ enum CompilePhaseAdapter {
     final int phaseId
     final String string
 
-    def CompilePhaseAdapter(phaseId, string) {
+    CompilePhaseAdapter(int phaseId, String string) {
         this.phaseId = phaseId
         this.string = string
     }
 
-    public String toString() {
+    String toString() {
         return string
     }
 }
@@ -580,6 +586,7 @@ enum CompilePhaseAdapter {
 /**
  * This class is a TreeNode and you can store additional properties on it.
  */
+@CompileStatic
 class TreeNodeWithProperties extends DefaultMutableTreeNode {
 
     List<List<String>> properties
@@ -589,7 +596,7 @@ class TreeNodeWithProperties extends DefaultMutableTreeNode {
      * @param userObject same as a DefaultMutableTreeNode requires
      * @param properties a list of String lists
      */
-    def TreeNodeWithProperties(userObject, List<List<String>> properties) {
+    TreeNodeWithProperties(userObject, List<List<String>> properties) {
         super(userObject)
         this.properties = properties
     }
@@ -611,6 +618,7 @@ class TreeNodeWithProperties extends DefaultMutableTreeNode {
 /**
  * This interface is used to create tree nodes of various types 
  */
+@CompileStatic
 interface AstBrowserNodeMaker<T> {
     T makeNode(Object userObject)
 
@@ -620,6 +628,7 @@ interface AstBrowserNodeMaker<T> {
 /**
  * Creates tree nodes for swing UI  
  */
+@CompileStatic
 class SwingTreeNodeMaker implements AstBrowserNodeMaker<DefaultMutableTreeNode> {
     DefaultMutableTreeNode makeNode(Object userObject) {
         new DefaultMutableTreeNode(userObject)
@@ -647,6 +656,7 @@ class BytecodeCollector extends ClassCollector {
 
 }
 
+@CompileStatic
 class GeneratedBytecodeAwareGroovyClassLoader extends GroovyClassLoader {
 
     private final Map<String, byte[]> bytecode = new HashMap<String, byte[]>()
@@ -661,11 +671,11 @@ class GeneratedBytecodeAwareGroovyClassLoader extends GroovyClassLoader {
         new BytecodeCollector(collector, bytecode)
     }
 
-    public void clearBytecodeTable() {
+    void clearBytecodeTable() {
         bytecode.clear()
     }
 
-    public byte[] getBytecode(final String className) {
+    byte[] getBytecode(final String className) {
         bytecode[className]
     }
 }

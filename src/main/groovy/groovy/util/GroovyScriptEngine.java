@@ -33,7 +33,6 @@ import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.Phases;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.customizers.CompilationCustomizer;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.tools.gse.DependencyTracker;
@@ -53,7 +52,6 @@ import java.security.CodeSource;
 import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.ConcurrentHashMap;
@@ -266,12 +264,8 @@ public class GroovyScriptEngine implements ResourceConnector {
                 Set<String> newDep = new HashSet<String>(origDep.size());
                 for (String depName : origDep) {
                     ScriptCacheEntry dep = scriptCache.get(depName);
-                    try {
-                        if (origEntry == dep || GroovyScriptEngine.this.isSourceNewer(dep)) {
-                            newDep.add(depName);
-                        }
-                    } catch (ResourceException re) {
-
+                    if (origEntry == dep || GroovyScriptEngine.this.isSourceNewer(dep)) {
+                        newDep.add(depName);
                     }
                 }
                 StringSetMap cache = localData.dependencyCache;
@@ -452,16 +446,7 @@ public class GroovyScriptEngine implements ResourceConnector {
     }
 
     private static void verifyInputStream(URLConnection urlConnection) throws IOException {
-        InputStream in = null;
-        try {
-            in = urlConnection.getInputStream();
-        } finally {
-            if (in != null) {
-                try {
-                    in.close();
-                } catch (IOException ignore) {
-                }
-            }
+        try (InputStream in = urlConnection.getInputStream()) {
         }
     }
 
@@ -624,7 +609,7 @@ public class GroovyScriptEngine implements ResourceConnector {
         return lastMod;
     }
 
-    protected boolean isSourceNewer(ScriptCacheEntry entry) throws ResourceException {
+    protected boolean isSourceNewer(ScriptCacheEntry entry) {
         if (entry == null) return true;
 
         long mainEntryLastCheck = entry.lastCheck;
@@ -645,7 +630,18 @@ public class GroovyScriptEngine implements ResourceConnector {
             long nextSourceCheck = depEntry.lastCheck + config.getMinimumRecompilationInterval();
             if (nextSourceCheck > now) continue;
 
-            long lastMod = getLastModified(scriptName);
+            long lastMod;
+            try {
+                lastMod = getLastModified(scriptName);
+            } catch (ResourceException e) {
+                /*
+                Class A depends on class B and they both are compiled once.  If class A is then
+                loaded again from loadScriptByName(scriptName) after class B and all references to
+                it have been deleted from the root, this exception will occur.  It is still valid
+                and necessary to attempt a recompile of class A.
+                */
+                return true;
+            }
             if (depEntry.lastModified < lastMod) {
                 depEntry = new ScriptCacheEntry(depEntry, lastMod, true);
                 scriptCache.put(scriptName, depEntry);

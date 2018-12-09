@@ -25,96 +25,115 @@ package groovy.lang;
  *
  * @since 2.5.0
  */
-public class Tuple9<T1, T2, T3, T4, T5, T6, T7, T8, T9> extends Tuple {
+public final class Tuple9<T1, T2, T3, T4, T5, T6, T7, T8, T9> extends Tuple {
     private static final long serialVersionUID = -5181196675351911769L;
-    private final T1 first;
-    private final T2 second;
-    private final T3 third;
-    private final T4 fourth;
-    private final T5 fifth;
-    private final T6 sixth;
-    private final T7 seventh;
-    private final T8 eighth;
-    private final T9 ninth;
+    private final T1 v1;
+    private final T2 v2;
+    private final T3 v3;
+    private final T4 v4;
+    private final T5 v5;
+    private final T6 v6;
+    private final T7 v7;
+    private final T8 v8;
+    private final T9 v9;
 
-    public Tuple9(T1 first, T2 second, T3 third, T4 fourth, T5 fifth, T6 sixth, T7 seventh, T8 eighth, T9 ninth) {
-        super(first, second, third, fourth, fifth, sixth, seventh, eighth, ninth);
+    public Tuple9(T1 v1, T2 v2, T3 v3, T4 v4, T5 v5, T6 v6, T7 v7, T8 v8, T9 v9) {
+        super(v1, v2, v3, v4, v5, v6, v7, v8, v9);
 
-        this.first = first;
-        this.second = second;
-        this.third = third;
-        this.fourth = fourth;
-        this.fifth = fifth;
-        this.sixth = sixth;
-        this.seventh = seventh;
-        this.eighth = eighth;
-        this.ninth = ninth;
+        this.v1 = v1;
+        this.v2 = v2;
+        this.v3 = v3;
+        this.v4 = v4;
+        this.v5 = v5;
+        this.v6 = v6;
+        this.v7 = v7;
+        this.v8 = v8;
+        this.v9 = v9;
     }
 
-    @Override
-    public Object get(int index) {
-        switch (index) {
-            case 0:
-                return first;
-            case 1:
-                return second;
-            case 2:
-                return third;
-            case 3:
-                return fourth;
-            case 4:
-                return fifth;
-            case 5:
-                return sixth;
-            case 6:
-                return seventh;
-            case 7:
-                return eighth;
-            case 8:
-                return ninth;
-            default:
-                throw new IndexOutOfBoundsException("index: " + index);
-        }
+    public Tuple9(Tuple9<T1, T2, T3, T4, T5, T6, T7, T8, T9> tuple) {
+        this(tuple.v1, tuple.v2, tuple.v3, tuple.v4, tuple.v5, tuple.v6, tuple.v7, tuple.v8, tuple.v9);
     }
 
-    @Override
-    public int size() {
-        return 9;
-    }
-
+    @Deprecated
     public T1 getFirst() {
-        return first;
+        return v1;
     }
 
+    @Deprecated
     public T2 getSecond() {
-        return second;
+        return v2;
     }
 
+    @Deprecated
     public T3 getThird() {
-        return third;
+        return v3;
     }
 
+    @Deprecated
     public T4 getFourth() {
-        return fourth;
+        return v4;
     }
 
+    @Deprecated
     public T5 getFifth() {
-        return fifth;
+        return v5;
     }
 
+    @Deprecated
     public T6 getSixth() {
-        return sixth;
+        return v6;
     }
 
+    @Deprecated
     public T7 getSeventh() {
-        return seventh;
+        return v7;
     }
 
+    @Deprecated
     public T8 getEighth() {
-        return eighth;
+        return v8;
     }
 
+    @Deprecated
     public T9 getNinth() {
-        return ninth;
+        return v9;
     }
+
+    public T1 getV1() {
+        return v1;
+    }
+
+    public T2 getV2() {
+        return v2;
+    }
+
+    public T3 getV3() {
+        return v3;
+    }
+
+    public T4 getV4() {
+        return v4;
+    }
+
+    public T5 getV5() {
+        return v5;
+    }
+
+    public T6 getV6() {
+        return v6;
+    }
+
+    public T7 getV7() {
+        return v7;
+    }
+
+    public T8 getV8() {
+        return v8;
+    }
+
+    public T9 getV9() {
+        return v9;
+    }
+
 }

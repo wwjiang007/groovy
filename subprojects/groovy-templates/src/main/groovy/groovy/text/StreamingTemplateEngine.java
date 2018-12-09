@@ -379,15 +379,9 @@ public class StreamingTemplateEngine extends TemplateEngine {
         private int getLinesInSource() throws IOException {
             int result = 0;
 
-            LineNumberReader reader = null;
-            try {
-                reader = new LineNumberReader(new StringReader(templateSource.toString()));
+            try (LineNumberReader reader = new LineNumberReader(new StringReader(templateSource.toString()))) {
                 reader.skip(Long.MAX_VALUE);
                 result = reader.getLineNumber();
-            } finally {
-                if (reader != null) {
-                    reader.close();
-                }
             }
 
             return result;
@@ -624,9 +618,7 @@ public class StreamingTemplateEngine extends TemplateEngine {
                 Closure chicken = (Closure) object.invokeMethod("getTemplate", null);
                 //bind the two first parameters of the generated closure to this class and the sections list
                 result = chicken.curry(this, sections);
-            } catch (InstantiationException e) {
-                throw new ClassNotFoundException(e.getMessage());
-            } catch (IllegalAccessException e) {
+            } catch (InstantiationException | IllegalAccessException e) {
                 throw new ClassNotFoundException(e.getMessage());
             }
 

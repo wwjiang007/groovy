@@ -18,14 +18,18 @@
  */
 package groovy.lang;
 
-import junit.framework.TestCase;
+import groovy.util.GroovyTestCase;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
+
+import static groovy.lang.Tuple.tuple;
 
 /**
  * @author James Strachan
  */
-public class TupleTest extends TestCase {
+public class TupleTest extends GroovyTestCase {
 
     final Object[] data = {"a", "b", "c"};
     final Tuple t = new Tuple(data);
@@ -41,15 +45,13 @@ public class TupleTest extends TestCase {
         try {
             t.get(-1);
             fail("Should have thrown IndexOut");
-        }
-        catch (IndexOutOfBoundsException e) {
+        } catch (IndexOutOfBoundsException e) {
             // worked
         }
         try {
             t.get(10);
             fail("Should have thrown IndexOut");
-        }
-        catch (IndexOutOfBoundsException e) {
+        } catch (IndexOutOfBoundsException e) {
             // worked
         }
 
@@ -306,5 +308,36 @@ public class TupleTest extends TestCase {
         assertEquals(9, t.get(8));
 
         assertEquals(t, t.subTuple(0, t.size()));
+    }
+
+    public void testEqualsHashCode() {
+        Set<Tuple2<Integer, String>> set = new HashSet<>();
+
+        set.add(tuple(1, "abc"));
+        assertEquals(1, set.size());
+        set.add(tuple(1, "abc"));
+        assertEquals(1, set.size());
+        set.add(tuple(null, null));
+        assertEquals(2, set.size());
+        set.add(tuple(null, null));
+        assertEquals(2, set.size());
+        set.add(tuple(1, null));
+        assertEquals(3, set.size());
+        set.add(tuple(1, null));
+        assertEquals(3, set.size());
+    }
+
+    public void testEqualsNull() {
+        assertFalse(tuple(1).equals(null));
+        assertFalse(tuple(1, 2).equals(null));
+        assertFalse(tuple(1, 2, 3).equals(null));
+    }
+
+    public void testGroovyStyleAccessor() {
+        try {
+            assertScript("def t = new Tuple1<String>('Daniel'); assert 'Daniel' == t.v1");
+        } catch (Exception e) {
+            assert false: e.getMessage();
+        }
     }
 }

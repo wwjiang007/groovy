@@ -117,18 +117,16 @@ public class JavaStubGenerator {
 
         File file = new File(outputPath, fileName + ".java");
         Charset charset = Charset.forName(encoding);
-        PrintWriter out =
-                new PrintWriter(
-                        new OutputStreamWriter(
-                                new BufferedOutputStream(
-                                        new FileOutputStream(file),
-                                        DEFAULT_BUFFER_SIZE
-                                ),
-                                charset
-                        )
-                );
 
-        try {
+        try (PrintWriter out = new PrintWriter(
+                new OutputStreamWriter(
+                        new BufferedOutputStream(
+                                new FileOutputStream(file),
+                                DEFAULT_BUFFER_SIZE
+                        ),
+                        charset
+                )
+        )) {
             String packageName = classNode.getPackageName();
             if (packageName != null) {
                 out.println("package " + packageName + ";\n");
@@ -137,12 +135,6 @@ public class JavaStubGenerator {
             printImports(out, classNode);
             printClassContents(out, classNode);
 
-        } finally {
-            try {
-                out.close();
-            } catch (Exception e) {
-                // ignore
-            }
         }
     }
 
@@ -162,7 +154,7 @@ public class JavaStubGenerator {
                         if (Traits.isTrait(inode)) {
                             List<PropertyNode> traitProps = inode.getProperties();
                             for (PropertyNode pn : traitProps) {
-                                visitProperty(pn);
+                                super.visitProperty(pn);
                             }
                         }
                     }
@@ -171,6 +163,14 @@ public class JavaStubGenerator {
                 @Override
                 protected FinalVariableAnalyzer.VariableNotFinalCallback getFinalVariablesCallback() {
                     return null;
+                }
+
+                @Override
+                public void visitProperty(PropertyNode node) {
+                    // GROOVY-8233 skip static properties for traits since they don't make the interface
+                    if (!node.isStatic() || !Traits.isTrait(node.getDeclaringClass())) {
+                        super.visitProperty(node);
+                    }
                 }
 
                 public void addCovariantMethods(ClassNode cn) {}
@@ -337,7 +337,7 @@ public class JavaStubGenerator {
                                 }
                             }
                         }
-                        if (method==null) {
+                        if (method==null && !traitMethod.isAbstract()) {
                             printMethod(out, classNode, traitMethod);
                         }
                     }

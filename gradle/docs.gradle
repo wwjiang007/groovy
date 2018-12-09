@@ -76,6 +76,8 @@ allprojects {
     groovydoc groovydocSpec
 }
 
+evaluationDependsOn('groovy-jaxb')
+
 // Root project has an extra 'all' javadoc task
 task javadocAll(type: Javadoc)
 javadocAll {
@@ -88,7 +90,6 @@ javadocAll {
     }
 }
 javadocAll javadocSpec
-
 
 // Root project has an extra 'all' groovydoc task
 task groovydocAll(type: Groovydoc)
@@ -156,6 +157,7 @@ task docGDK {
                     arg(value: 'subprojects/groovy-dateutil/src/main/java/org/apache/groovy/dateutil/extensions/DateUtilExtensions.java')
                     arg(value: 'subprojects/groovy-datetime/src/main/java/org/apache/groovy/datetime/extensions/DateTimeExtensions.java')
                     arg(value: 'subprojects/groovy-datetime/src/main/java/org/apache/groovy/datetime/extensions/DateTimeStaticExtensions.java')
+                    arg(value: 'subprojects/groovy-jaxb/src/main/groovy/org/apache/groovy/jaxb/extensions/JaxbExtensions.java')
                     arg(value: 'subprojects/groovy-sql/src/main/java/org/apache/groovy/sql/extensions/SqlExtensions.java')
                     arg(value: 'subprojects/groovy-swing/src/main/java/org/codehaus/groovy/runtime/SwingGroovyMethods.java')
                     arg(value: 'subprojects/groovy-xml/src/main/java/org/codehaus/groovy/runtime/XmlGroovyMethods.java')

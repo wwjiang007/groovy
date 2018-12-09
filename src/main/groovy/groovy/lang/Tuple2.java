@@ -21,40 +21,38 @@ package groovy.lang;
 /**
  * Represents a list of 2 typed Objects.
  */
-public class Tuple2<T1, T2> extends Tuple {
+public final class Tuple2<T1, T2> extends Tuple {
     private static final long serialVersionUID = 9006144674906325597L;
-    private final T1 first;
-    private final T2 second;
+    private final T1 v1;
+    private final T2 v2;
 
-    public Tuple2(T1 first, T2 second) {
-        super(first, second);
+    public Tuple2(T1 v1, T2 v2) {
+        super(v1, v2);
 
-        this.first = first;
-        this.second = second;
+        this.v1 = v1;
+        this.v2 = v2;
     }
 
-    @Override
-    public Object get(int index) {
-        switch (index) {
-            case 0:
-                return first;
-            case 1:
-                return second;
-            default:
-                throw new IndexOutOfBoundsException("index: " + index);
-        }
+    public Tuple2(Tuple2<T1, T2> tuple) {
+        this(tuple.v1, tuple.v2);
     }
 
-    @Override
-    public int size() {
-        return 2;
-    }
-
+    @Deprecated
     public T1 getFirst() {
-        return first;
+        return v1;
     }
 
+    @Deprecated
     public T2 getSecond() {
-        return second;
+        return v2;
     }
+
+    public T1 getV1() {
+        return v1;
+    }
+
+    public T2 getV2() {
+        return v2;
+    }
+
 }

@@ -369,7 +369,7 @@ public class Groovy extends Java {
 
         while ((line = in.readLine()) != null) {
             line = getProject().replaceProperties(line);
-            if (line.indexOf("--") >= 0) {
+            if (line.contains("--")) {
                 txt.append("\n");
             }
         }
@@ -528,9 +528,7 @@ public class Groovy extends Java {
                 shell.run(txt, scriptName, cmdline.getCommandline());
             }
         }
-        catch (final CompilationFailedException e) {
-            processError(e);
-        } catch (IOException e) {
+        catch (final CompilationFailedException | IOException e) {
             processError(e);
         }
     }
@@ -583,9 +581,9 @@ public class Groovy extends Java {
         if (groovyHome == null) {
             throw new IllegalStateException("Neither ${groovy.home} nor GROOVY_HOME defined.");
         }
-        File jarDir = new File(groovyHome, "embeddable");
+        File jarDir = new File(groovyHome, "lib");
         if (!jarDir.exists()) {
-            throw new IllegalStateException("GROOVY_HOME incorrectly defined. No embeddable directory found in: " + groovyHome);
+            throw new IllegalStateException("GROOVY_HOME incorrectly defined. No lib directory found in: " + groovyHome);
         }
         final File[] files = jarDir.listFiles();
         for (File file : files) {

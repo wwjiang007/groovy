@@ -41,6 +41,7 @@ import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.Phases;
 import org.codehaus.groovy.control.SourceUnit;
+import org.codehaus.groovy.runtime.EncodingGroovyMethods;
 import org.codehaus.groovy.runtime.IOGroovyMethods;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.runtime.memoize.EvictableCache;
@@ -66,6 +67,7 @@ import java.net.URLConnection;
 import java.net.URLDecoder;
 import java.security.AccessController;
 import java.security.CodeSource;
+import java.security.NoSuchAlgorithmException;
 import java.security.Permission;
 import java.security.PermissionCollection;
 import java.security.Permissions;
@@ -315,8 +317,13 @@ public class GroovyClassLoader extends URLClassLoader {
      * @return the main class defined in the given script
      */
     public Class parseClass(final GroovyCodeSource codeSource, boolean shouldCacheSource) throws CompilationFailedException {
+        // it's better to cache class instances by the source code
+        // GCL will load the unique class instance for the same source code
+        // and avoid occupying Permanent Area/Metaspace repeatedly
+        String cacheKey = genSourceCacheKey(codeSource);
+
         return ((StampedCommonCache<String, Class>) sourceCache).getAndPut(
-                codeSource.getName(),
+                cacheKey,
                 new EvictableCache.ValueProvider<String, Class>() {
                     @Override
                     public Class provide(String key) {
@@ -325,6 +332,34 @@ public class GroovyClassLoader extends URLClassLoader {
                 },
                 shouldCacheSource
         );
+    }
+
+    private String genSourceCacheKey(GroovyCodeSource codeSource) {
+        StringBuilder strToDigest;
+
+        String scriptText = codeSource.getScriptText();
+        if (null != scriptText) {
+            strToDigest = new StringBuilder((int) (scriptText.length() * 1.2));
+            strToDigest.append("scriptText:").append(scriptText);
+
+            CodeSource cs = codeSource.getCodeSource();
+            if (null != cs) {
+                strToDigest.append("/codeSource:").append(cs);
+            }
+        } else {
+            strToDigest = new StringBuilder(32);
+            // if the script text is null, i.e. the script content is invalid
+            // use the name as cache key for the time being to trigger the validation by `groovy.lang.GroovyClassLoader.validate`
+            // note: the script will not be cached due to the invalid script content,
+            //       so it does not matter even if cache key is not the md5 value of script content
+            strToDigest.append("name:").append(codeSource.getName());
+        }
+
+        try {
+            return EncodingGroovyMethods.md5(strToDigest);
+        } catch (NoSuchAlgorithmException e) {
+            throw new GroovyRuntimeException(e); // should never reach here!
+        }
     }
 
     private Class doParseClass(GroovyCodeSource codeSource) {
@@ -801,7 +836,7 @@ public class GroovyClassLoader extends URLClassLoader {
     protected Class recompile(URL source, String className, Class oldClass) throws CompilationFailedException, IOException {
         if (source != null) {
             // found a source, compile it if newer
-            if ((oldClass != null && isSourceNewer(source, oldClass)) || (oldClass == null)) {
+            if (oldClass == null || isSourceNewer(source, oldClass)) {
                 String name = source.toExternalForm();
 
                 sourceCache.remove(name);
@@ -960,14 +995,8 @@ public class GroovyClassLoader extends URLClassLoader {
                     newURI = new URI(path);
                     // check if we can create a URL from that URI
                     newURI.toURL();
-                } catch (URISyntaxException e) {
+                } catch (URISyntaxException | IllegalArgumentException | MalformedURLException e) {
                     // the URI has a false format, so lets try it with files ...
-                    newURI=new File(path).toURI();
-                } catch (MalformedURLException e) {
-                    // the URL has a false format, so lets try it with files ...
-                    newURI=new File(path).toURI();
-                } catch (IllegalArgumentException e) {
-                    // the URL is not absolute, so lets try it with files ...
                     newURI=new File(path).toURI();
                 }
 

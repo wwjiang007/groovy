@@ -54,6 +54,7 @@ import groovy.util.MapEntry;
 import groovy.util.OrderBy;
 import groovy.util.PermutationGenerator;
 import groovy.util.ProxyGenerator;
+import org.apache.groovy.io.StringBuilderWriter;
 import org.codehaus.groovy.classgen.Verifier;
 import org.codehaus.groovy.reflection.ClassInfo;
 import org.codehaus.groovy.reflection.MixinInMetaClass;
@@ -7817,6 +7818,13 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
     }
 
     /**
+     * Support subscript operator for list access.
+     */
+    public static <T> T getAt(List<T> self, Number idx) {
+        return getAt(self, idx.intValue());
+    }
+
+    /**
      * Support the subscript operator for an Iterator. The iterator
      * will be partially exhausted up until the idx entry after returning
      * if a +ve or 0 idx is used, or fully exhausted if a -ve idx is used
@@ -7911,6 +7919,13 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
             }
             self.add(idx, value);
         }
+    }
+
+    /**
+     * Support subscript operator for list modification.
+     */
+    public static <T> void putAt(List<T> self, Number idx, T value) {
+        putAt(self, idx.intValue(), value);
     }
 
     /**
@@ -12533,6 +12548,69 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
     @Deprecated
     public static boolean disjoint(Collection left, Collection right) {
         return disjoint((Iterable) left, (Iterable) right);
+    }
+
+    /**
+     * Chops the array into pieces, returning lists with sizes corresponding to the supplied chop sizes.
+     * If the array isn't large enough, truncated (possibly empty) pieces are returned.
+     * Using a chop size of -1 will cause that piece to contain all remaining items from the array.
+     *
+     * @param self      an Array to be chopped
+     * @param chopSizes the sizes for the returned pieces
+     * @return a list of lists chopping the original array elements into pieces determined by chopSizes
+     * @see #collate(Object[], int) to chop a list into pieces of a fixed size
+     * @since 2.5.2
+     */
+    public static <T> List<List<T>> chop(T[] self, int... chopSizes) {
+        return chop(Arrays.asList(self), chopSizes);
+    }
+
+    /**
+     * Chops the Iterable into pieces, returning lists with sizes corresponding to the supplied chop sizes.
+     * If the Iterable isn't large enough, truncated (possibly empty) pieces are returned.
+     * Using a chop size of -1 will cause that piece to contain all remaining items from the Iterable.
+     * <p>
+     * Example usage:
+     * <pre class="groovyTestCase">
+     * assert [1, 2, 3, 4].chop(1) == [[1]]
+     * assert [1, 2, 3, 4].chop(1,-1) == [[1], [2, 3, 4]]
+     * assert ('a'..'h').chop(2, 4) == [['a', 'b'], ['c', 'd', 'e', 'f']]
+     * assert ['a', 'b', 'c', 'd', 'e'].chop(3) == [['a', 'b', 'c']]
+     * assert ['a', 'b', 'c', 'd', 'e'].chop(1, 2, 3) == [['a'], ['b', 'c'], ['d', 'e']]
+     * assert ['a', 'b', 'c', 'd', 'e'].chop(1, 2, 3, 3, 3) == [['a'], ['b', 'c'], ['d', 'e'], [], []]
+     * </pre>
+     *
+     * @param self      an Iterable to be chopped
+     * @param chopSizes the sizes for the returned pieces
+     * @return a list of lists chopping the original iterable into pieces determined by chopSizes
+     * @see #collate(Iterable, int) to chop an Iterable into pieces of a fixed size
+     * @since 2.5.2
+     */
+    public static <T> List<List<T>> chop(Iterable<T> self, int... chopSizes) {
+        return chop(self.iterator(), chopSizes);
+    }
+
+    /**
+     * Chops the iterator items into pieces, returning lists with sizes corresponding to the supplied chop sizes.
+     * If the iterator is exhausted early, truncated (possibly empty) pieces are returned.
+     * Using a chop size of -1 will cause that piece to contain all remaining items from the iterator.
+     *
+     * @param self      an Iterator to be chopped
+     * @param chopSizes the sizes for the returned pieces
+     * @return a list of lists chopping the original iterator elements into pieces determined by chopSizes
+     * @since 2.5.2
+     */
+    public static <T> List<List<T>> chop(Iterator<T> self, int... chopSizes) {
+        List<List<T>> result = new ArrayList<List<T>>();
+        for (Integer nextSize : chopSizes) {
+            int size = nextSize;
+            List<T> next = new ArrayList<T>();
+            while (size-- != 0 && self.hasNext()) {
+                next.add(self.next());
+            }
+            result.add(next);
+        }
+        return result;
     }
 
     /**
@@ -17758,5 +17836,22 @@ public class DefaultGroovyMethods extends DefaultGroovyMethodsSupport {
     @Deprecated
     public static <T> T asType(CharSequence self, Class<T> c) {
         return StringGroovyMethods.asType(self, c);
+    }
+
+    /**
+     * Get the detail information of {@link Throwable} instance's stack trace
+     *
+     * @param self a Throwable instance
+     * @return the detail information of stack trace
+     * @since 2.5.3
+     */
+    public static String asString(Throwable self) {
+        StringBuilderWriter sw = new StringBuilderWriter();
+
+        try (PrintWriter pw = new PrintWriter(sw)) {
+            self.printStackTrace(pw);
+        }
+
+        return sw.toString();
     }
 }

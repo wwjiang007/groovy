@@ -23,32 +23,26 @@ package groovy.lang;
  *
  * @since 2.5.0
  */
-public class Tuple1<T1> extends Tuple {
+public final class Tuple1<T1> extends Tuple {
     private static final long serialVersionUID = -4647790147461409603L;
-    private final T1 first;
+    private final T1 v1;
 
-    public Tuple1(T1 first) {
-        super(first);
+    public Tuple1(T1 t1) {
+        super(t1);
 
-        this.first = first;
+        this.v1 = t1;
     }
 
-    @Override
-    public Object get(int index) {
-        switch (index) {
-            case 0:
-                return first;
-            default:
-                throw new IndexOutOfBoundsException("index: " + index);
-        }
+    public Tuple1(Tuple1<T1> tuple) {
+        this(tuple.v1);
     }
 
-    @Override
-    public int size() {
-        return 1;
-    }
-
+    @Deprecated
     public T1 getFirst() {
-        return first;
+        return v1;
+    }
+
+    public T1 getV1() {
+        return v1;
     }
 }

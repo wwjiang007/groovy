@@ -49,6 +49,12 @@ public class CompilerConfiguration {
     /** This (<code>"indy"</code>) is the Optimization Option value for enabling <code>invokedynamic</code> compilation. */
     public static final String INVOKEDYNAMIC = "indy";
 
+    /** This (<code>"groovdoc"</code>) is the Optimization Option value for enabling attaching groovydoc as AST node metadata. */
+    public static final String GROOVYDOC = "groovdoc";
+
+    /** This (<code>"runtimeGroovdoc"</code>) is the Optimization Option value for enabling attaching {@link groovy.lang.Groovydoc} annotation*/
+    public static final String RUNTIME_GROOVYDOC = "runtimeGroovdoc";
+
     /** This (<code>"1.4"</code>) is the value for targetBytecode to compile for a JDK 1.4. **/
     public static final String JDK4 = "1.4";
     /** This (<code>"1.5"</code>) is the value for targetBytecode to compile for a JDK 1.5. **/
@@ -61,10 +67,25 @@ public class CompilerConfiguration {
     public static final String JDK8 = "1.8";
     /** This (<code>"9"</code>) is the value for targetBytecode to compile for a JDK 9. **/
     public static final String JDK9 = "9";
-    /** This (<code>"1.5"</code>) is the value for targetBytecode to compile for a JDK 1.5 or later JVM. **/
+    /** This (<code>"10"</code>) is the value for targetBytecode to compile for a JDK 10. **/
+    public static final String JDK10 = "10";
+    /** This (<code>"11"</code>) is the value for targetBytecode to compile for a JDK 11. **/
+    public static final String JDK11 = "11";
+    /** This (<code>"12"</code>) is the value for targetBytecode to compile for a JDK 12. **/
+    public static final String JDK12 = "12";
+
+    /**
+     * This constant is for comparing targetBytecode to ensure it is set to JDK 1.5 or later.
+     * @deprecated
+     */
+    @Deprecated
     public static final String POST_JDK5 = JDK5; // for backwards compatibility
 
-    /** This (<code>"1.4"</code>) is the value for targetBytecode to compile for a JDK 1.4 JVM. **/
+    /**
+     * This constant is for comparing targetBytecode to ensure it is set to an earlier value than JDK 1.5.
+     * @deprecated
+     */
+    @Deprecated
     public static final String PRE_JDK5 = JDK4;
 
     /**
@@ -76,11 +97,15 @@ public class CompilerConfiguration {
             JDK6, Opcodes.V1_6,
             JDK7, Opcodes.V1_7,
             JDK8, Opcodes.V1_8,
-            JDK9, Opcodes.V9
+            JDK9, Opcodes.V9,
+            JDK10, Opcodes.V10,
+            JDK11, Opcodes.V11,
+            JDK12, Opcodes.V12
     );
 
+    private static final String[] EMPTY_STRING_ARRAY = new String[0];
     /** An array of the valid targetBytecode values **/
-    public static final String[] ALLOWED_JDKS = JDK_TO_BYTECODE_VERSION_MAP.keySet().toArray(new String[0]);
+    public static final String[] ALLOWED_JDKS = JDK_TO_BYTECODE_VERSION_MAP.keySet().toArray(EMPTY_STRING_ARRAY);
 
     private static final String GROOVY_ANTLR4_OPT = "groovy.antlr4";
 
@@ -189,9 +214,9 @@ public class CompilerConfiguration {
     private final List<CompilationCustomizer> compilationCustomizers = new LinkedList<CompilationCustomizer>();
 
     /**
-     * Sets a list of global AST transformations which should not be loaded even if they are
-     * defined in META-INF/org.codehaus.groovy.transform.ASTTransformation files. By default,
-     * none is disabled.
+     * Global AST transformations which should not be loaded even if they are
+     * defined in META-INF/services/org.codehaus.groovy.transform.ASTTransformation files.
+     * By default, none are disabled.
      */
     private Set<String> disabledGlobalASTTransformations;
 
@@ -206,7 +231,7 @@ public class CompilerConfiguration {
      */
     private ParserVersion parserVersion = ParserVersion.V_4;
 
-    public static final int ASM_API_VERSION = Opcodes.ASM6;
+    public static final int ASM_API_VERSION = Opcodes.ASM7;
 
     /**
      * Sets the Flags to defaults.
@@ -246,14 +271,12 @@ public class CompilerConfiguration {
             setTargetDirectory(target);
         }
 
-        boolean indy = getBooleanSafe("groovy.target.indy");
-        if (DEFAULT!=null && Boolean.TRUE.equals(DEFAULT.getOptimizationOptions().get(INVOKEDYNAMIC))) {
-            indy = true;
-        }
-        Map options = new HashMap<String,Boolean>(3);
-        if (indy) {
-            options.put(INVOKEDYNAMIC, Boolean.TRUE);
-        }
+        Map<String, Boolean> options = new HashMap<>(4);
+
+        handleOptimizationOption(options, INVOKEDYNAMIC, "groovy.target.indy");
+        handleOptimizationOption(options, GROOVYDOC, "groovy.attach.groovydoc");
+        handleOptimizationOption(options, RUNTIME_GROOVYDOC, "groovy.attach.runtime.groovydoc");
+
         setOptimizationOptions(options);
 
         try {
@@ -265,6 +288,16 @@ public class CompilerConfiguration {
                             : ParserVersion.V_2;
         } catch (Exception e) {
             // IGNORE
+        }
+    }
+
+    private void handleOptimizationOption(Map<String, Boolean> options, String optionName, String sysOptionName) {
+        boolean optionEnabled = getBooleanSafe(sysOptionName);
+        if (DEFAULT != null && Boolean.TRUE.equals(DEFAULT.getOptimizationOptions().get(optionName))) {
+            optionEnabled = true;
+        }
+        if (optionEnabled) {
+            options.put(optionName, Boolean.TRUE);
         }
     }
 
@@ -389,7 +422,7 @@ public class CompilerConfiguration {
      * Checks if the specified bytecode version string represents a JDK 1.8+ compatible
      * bytecode version.
      * @param bytecodeVersion The parameter can take one of the values in {@link #ALLOWED_JDKS}.
-     * @return true if the bytecode version is JDK 1.87+
+     * @return true if the bytecode version is JDK 1.8+
      */
     public static boolean isPostJDK8(String bytecodeVersion) {
         return new BigDecimal(bytecodeVersion).compareTo(new BigDecimal(JDK8)) >= 0;
@@ -718,7 +751,7 @@ public class CompilerConfiguration {
         if (pluginFactory == null) {
             pluginFactory = ParserVersion.V_2 == parserVersion
                                 ? ParserPluginFactory.antlr2()
-                                : ParserPluginFactory.antlr4();
+                                : ParserPluginFactory.antlr4(this);
         }
         return pluginFactory;
     }
@@ -865,13 +898,15 @@ public class CompilerConfiguration {
     }
 
     /**
-     * Disables global AST transformations. In order to avoid class loading side effects, it is not recommended
+     * Disables the specified global AST transformations. In order to avoid class loading side effects, it is not recommended
      * to use MyASTTransformation.class.getName() by directly use the class name as a string. Disabled AST transformations
      * only apply to automatically loaded global AST transformations, that is to say transformations defined in a
-     * META-INF/org.codehaus.groovy.transform.ASTTransformation file. If you explicitly add a global AST transformation
+     * META-INF/services/org.codehaus.groovy.transform.ASTTransformation file.
+     * If you explicitly add a global AST transformation
      * in your compilation process, for example using the {@link org.codehaus.groovy.control.customizers.ASTTransformationCustomizer} or
      * using a {@link org.codehaus.groovy.control.CompilationUnit.PrimaryClassNodeOperation}, then nothing will prevent
      * the transformation from being loaded.
+     *
      * @param disabledGlobalASTTransformations a set of fully qualified class names of global AST transformations
      * which should not be loaded.
      */
@@ -907,6 +942,34 @@ public class CompilerConfiguration {
         }
 
         return indyEnabled;
+    }
+
+    /**
+     * Check whether groovydoc enabled
+     * @return the result
+     */
+    public boolean isGroovydocEnabled() {
+        Boolean groovydocEnabled = this.getOptimizationOptions().get(GROOVYDOC);
+
+        if (null == groovydocEnabled) {
+            return false;
+        }
+
+        return groovydocEnabled;
+    }
+
+    /**
+     * Check whether runtime groovydoc enabled
+     * @return the result
+     */
+    public boolean isRuntimeGroovydocEnabled() {
+        Boolean runtimeGroovydocEnabled = this.getOptimizationOptions().get(RUNTIME_GROOVYDOC);
+
+        if (null == runtimeGroovydocEnabled) {
+            return false;
+        }
+
+        return runtimeGroovydocEnabled;
     }
 
 //       See http://groovy.329449.n5.nabble.com/What-the-static-compile-by-default-tt5750118.html

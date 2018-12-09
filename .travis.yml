@@ -22,6 +22,7 @@ dist: trusty
 
 matrix:
   include:
+    - jdk: openjdk11
     - jdk: openjdk10
     - jdk: oraclejdk9
     - jdk: oraclejdk8

@@ -212,7 +212,7 @@ project.ext.pomConfigureClosureWithoutTweaks = {
             developer {
                 id 'russel'
                 name 'Russel Winder'
-                email 'russel@russel.org.uk'
+                email 'russel@winder.org.uk'
                 organization 'Concertant LLP & It\'z Interactive Ltd'
                 roles {
                     role 'Developer'
@@ -632,6 +632,24 @@ project.ext.pomConfigureClosureWithoutTweaks = {
             }
             contributor {
                 name 'mgroovy'
+            }
+            contributor {
+                name 'Dominik Przybysz'
+            }
+            contributor {
+                name 'Shruti Gupta'
+            }
+            contributor {
+                name 'Ben Yu'
+            }
+            contributor {
+                name 'Dejan Bosanac'
+            }
+            contributor {
+                name 'Lidia Donajczyk-Lipinska'
+            }
+            contributor {
+                name 'Peter Gromov'
             }
         }
         mailingLists {

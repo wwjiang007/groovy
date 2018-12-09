@@ -18,7 +18,9 @@
  */
 package groovy.inspect.swingui
 
+import groovy.transform.CompileStatic
 import org.apache.groovy.io.StringBuilderWriter
+import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.AnnotationNode
 import org.codehaus.groovy.ast.ClassHelper
 import org.codehaus.groovy.ast.ClassNode
@@ -95,14 +97,17 @@ import org.codehaus.groovy.control.CompilationUnit.PrimaryClassNodeOperation
 import org.codehaus.groovy.control.CompilePhase
 import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.SourceUnit
+import org.codehaus.groovy.syntax.Types
 
 import java.lang.reflect.Modifier
+import java.security.CodeSource
 
 /**
  * This class takes Groovy source code, compiles it to a specific compile phase, and then decompiles it
  * back to the groovy source. It is used by GroovyConsole's AST Browser, but can also be invoked from
  * the command line.
  */
+@CompileStatic
 class AstNodeToScriptAdapter {
 
     /**
@@ -110,7 +115,7 @@ class AstNodeToScriptAdapter {
      * @param args
      *      a filename to compile and a CompilePhase to run to
      */
-    static void main(args) {
+    static void main(String[] args) {
 
         if (!args || args.length < 2) {
             println '''
@@ -148,6 +153,7 @@ and [compilephase] is a valid Integer based org.codehaus.groovy.control.CompileP
      *    optional compiler configuration
      * @returns the source code from the AST state
      */
+
     String compileToScript(String script, int compilePhase, ClassLoader classLoader = null, boolean showScriptFreeForm = true, boolean showScriptClass = true, CompilerConfiguration config = null) {
 
         def writer = new StringBuilderWriter()
@@ -156,7 +162,7 @@ and [compilephase] is a valid Integer based org.codehaus.groovy.control.CompileP
 
         def scriptName = 'script' + System.currentTimeMillis() + '.groovy'
         GroovyCodeSource codeSource = new GroovyCodeSource(script, scriptName, '/groovy/script')
-        CompilationUnit cu = new CompilationUnit(config ?: CompilerConfiguration.DEFAULT, codeSource.codeSource, classLoader)
+        CompilationUnit cu = new CompilationUnit((CompilerConfiguration) (config ?: CompilerConfiguration.DEFAULT), (CodeSource) codeSource.codeSource, (GroovyClassLoader) classLoader)
         cu.addPhaseOperation(new AstNodeToScriptVisitor(writer, showScriptFreeForm, showScriptClass), compilePhase)
         cu.addSource(codeSource.getName(), script)
         try {
@@ -180,6 +186,7 @@ and [compilephase] is a valid Integer based org.codehaus.groovy.control.CompileP
 /**
  * An adapter from ASTNode tree to source code.
  */
+@CompileStatic
 class AstNodeToScriptVisitor extends PrimaryClassNodeOperation implements GroovyCodeVisitor, GroovyClassVisitor {
 
     private final Writer _out
@@ -728,11 +735,13 @@ class AstNodeToScriptVisitor extends PrimaryClassNodeOperation implements Groovy
     @Override
     void visitBinaryExpression(BinaryExpression expression) {
         expression?.leftExpression?.visit this
-        print " $expression.operation.text "
-        expression.rightExpression.visit this
+        if (!(expression.rightExpression instanceof EmptyExpression) || expression.operation.type != Types.ASSIGN) {
+            print " $expression.operation.text "
+            expression.rightExpression.visit this
 
-        if (expression?.operation?.text == '[') {
-            print ']'
+            if (expression?.operation?.text == '[') {
+                print ']'
+            }
         }
     }
 
@@ -793,7 +802,7 @@ class AstNodeToScriptVisitor extends PrimaryClassNodeOperation implements Groovy
         }
         print '.'
         if (expression?.property instanceof ConstantExpression) {
-            visitConstantExpression(expression?.property, true)
+            visitConstantExpression((ConstantExpression) expression?.property, true)
         } else {
             expression?.property?.visit this
         }
@@ -838,7 +847,7 @@ class AstNodeToScriptVisitor extends PrimaryClassNodeOperation implements Groovy
         // handle multiple assignment expressions
         if (expression?.leftExpression instanceof ArgumentListExpression) {
             print 'def '
-            visitArgumentlistExpression expression?.leftExpression, true
+            visitArgumentlistExpression((ArgumentListExpression) expression?.leftExpression, true)
             print " $expression.operation.text "
             expression.rightExpression.visit this
 
@@ -942,7 +951,7 @@ class AstNodeToScriptVisitor extends PrimaryClassNodeOperation implements Groovy
         if (expression?.mapEntryExpressions?.size() == 0) {
             print ':'
         } else {
-            visitExpressionsAndCommaSeparate(expression?.mapEntryExpressions)
+            visitExpressionsAndCommaSeparate((List) expression?.mapEntryExpressions)
         }
         print ']'
     }
@@ -1119,7 +1128,7 @@ class AstNodeToScriptVisitor extends PrimaryClassNodeOperation implements Groovy
                 print ', '
             }
             first = false
-            it.visit this
+            ((ASTNode) it).visit this
         }
     }
 
