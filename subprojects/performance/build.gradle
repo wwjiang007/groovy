@@ -20,17 +20,17 @@
 import java.text.DecimalFormat
 
 plugins {
-    id "me.champeau.gradle.jmh" version "0.4.7"
+    id "me.champeau.gradle.jmh" version "0.4.8"
 }
 
 configurations {
     stats
-    testCompile.extendsFrom(stats)
+    testImplementation.extendsFrom(stats)
 }
 
 dependencies {
     jmh rootProject
-    testCompile 'org.codehaus.groovy:groovy-all:2.4.12'
+    testImplementation 'org.codehaus.groovy:groovy-all:2.4.12'
     stats 'org.apache.commons:commons-math3:3.6'
 }
 

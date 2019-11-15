@@ -17,16 +17,22 @@
  *  under the License.
  */
 package org.codehaus.groovy.runtime
+
+import groovy.test.GroovyTestCase
+
 /**
  * Tests for DefaultGroovyStaticMethods
  */
 class DefaultGroovyStaticMethodsTest extends GroovyTestCase {
-
     void testCurrentTimeSeconds() {
 	    long timeMillis = System.currentTimeMillis()
         long timeSeconds = System.currentTimeSeconds()
         long timeMillis2 = System.currentTimeMillis()
         assert timeMillis/1000 as int <= timeSeconds
         assert timeMillis2/1000 as int >= timeSeconds
+    }
+
+    void testDumpAll() {
+        assert Thread.dumpAll().contains("dumpAll")
     }
 }

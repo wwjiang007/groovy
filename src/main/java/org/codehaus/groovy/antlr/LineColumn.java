@@ -20,8 +20,6 @@ package org.codehaus.groovy.antlr;
 
 /**
  * An object representing a line and column position
- *
- * @author <a href="mailto:groovy@ross-rayner.com">Jeremy Rayner</a>
  */
 public class LineColumn {
     private int line;
@@ -47,9 +45,7 @@ public class LineColumn {
         final LineColumn lineColumn = (LineColumn) that;
 
         if (column != lineColumn.column) return false;
-        if (line != lineColumn.line) return false;
-
-        return true;
+        return line == lineColumn.line;
     }
 
     public int hashCode() {

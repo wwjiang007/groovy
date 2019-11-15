@@ -49,6 +49,7 @@ import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.ImportNode;
 import org.codehaus.groovy.ast.InnerClassNode;
 import org.codehaus.groovy.ast.MethodNode;
+import org.codehaus.groovy.ast.ModifierNode;
 import org.codehaus.groovy.ast.ModuleNode;
 import org.codehaus.groovy.ast.NodeMetaDataHandler;
 import org.codehaus.groovy.ast.PackageNode;
@@ -130,13 +131,14 @@ import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Optional;
 import java.util.Set;
-import java.util.logging.Logger;
 import java.util.stream.Collectors;
 import java.util.stream.Stream;
 
@@ -153,7 +155,6 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.AnonymousInnerCla
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ArgumentsContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ArrayInitializerContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.AssertStatementContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.AssertStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.AssignmentExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.BlockContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.BlockStatementContext;
@@ -161,9 +162,7 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.BlockStatementsCo
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.BlockStatementsOptContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.BooleanLiteralAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.BreakStatementContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.BreakStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.BuiltInTypeContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.BuiltInTypePrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CASE;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CastExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CastParExpressionContext;
@@ -180,16 +179,14 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.ClassOrInterfaceT
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ClassicalForControlContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ClassifiedModifiersContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ClosureContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.ClosurePrmrAltContext;
+import static org.apache.groovy.parser.antlr4.GroovyLangParser.ClosureOrLambdaExpressionContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CommandArgumentContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CommandExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CommandExpressionContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CompilationUnitContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ConditionalExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ConditionalStatementContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.ConditionalStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ContinueStatementContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.ContinueStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CreatedNameContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.CreatorContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.DEC;
@@ -216,7 +213,6 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.ExpressionContext
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ExpressionInParContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ExpressionListContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ExpressionListElementContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.ExpressionStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.FieldDeclarationContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.FinallyBlockContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.FloatingPointLiteralAltContext;
@@ -232,7 +228,6 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.GT;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.GroovyParserRuleContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.GstringContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.GstringPathContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.GstringPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.GstringValueContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.IN;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.INC;
@@ -241,7 +236,6 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.IdentifierContext
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.IdentifierPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.IfElseStatementContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ImportDeclarationContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.ImportStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.InclusiveOrExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.IndexPropertyArgsContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.IntegerLiteralAltContext;
@@ -250,12 +244,8 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.LE;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.LT;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.LabeledStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.LambdaBodyContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.LambdaPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ListContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.ListPrmrAltContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.LiteralPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.LocalVariableDeclarationContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.LocalVariableDeclarationStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.LogicalAndExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.LogicalOrExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.LoopStmtAltContext;
@@ -263,11 +253,9 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.MapContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.MapEntryContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.MapEntryLabelContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.MapEntryListContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.MapPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.MemberDeclarationContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.MethodBodyContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.MethodDeclarationContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.MethodDeclarationStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.MethodNameContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ModifierContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ModifiersContext;
@@ -284,10 +272,8 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.NullLiteralAltCon
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.PRIVATE;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.PackageDeclarationContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ParExpressionContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.ParenPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.PathElementContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.PathExpressionContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.PostfixExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.PostfixExpressionContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.PowerExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.PrimitiveTypeContext;
@@ -304,12 +290,11 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.ReturnStmtAltCont
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ReturnTypeContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.STATIC;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.SUB;
+import static org.apache.groovy.parser.antlr4.GroovyLangParser.ScriptStatementsContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ShiftExprAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.StandardLambdaExpressionContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.StandardLambdaParametersContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.StatementContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.StatementsContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.StringLiteralAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.StringLiteralContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.SuperPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.SwitchBlockStatementGroupContext;
@@ -320,14 +305,12 @@ import static org.apache.groovy.parser.antlr4.GroovyLangParser.ThisFormalParamet
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ThisPrmrAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.ThrowStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TryCatchStatementContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.TryCatchStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeArgumentContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeArgumentsContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeArgumentsOrDiamondContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeBoundContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeDeclarationContext;
-import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeDeclarationStmtAltContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeListContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeNamePairContext;
 import static org.apache.groovy.parser.antlr4.GroovyLangParser.TypeNamePairsContext;
@@ -352,27 +335,21 @@ import static org.codehaus.groovy.runtime.DefaultGroovyMethods.asBoolean;
 import static org.codehaus.groovy.runtime.DefaultGroovyMethods.last;
 
 /**
- * Building the AST from the parse tree generated by Antlr4
- *
- * @author <a href="mailto:realbluesun@hotmail.com">Daniel.Sun</a>
- *         Created on 2016/08/14
+ * Builds the AST from the parse tree generated by Antlr4.
  */
 public class AstBuilder extends GroovyParserBaseVisitor<Object> implements GroovyParserVisitor<Object> {
 
     public AstBuilder(SourceUnit sourceUnit, CompilerConfiguration compilerConfiguration) {
         this.sourceUnit = sourceUnit;
-        this.compilerConfiguration = compilerConfiguration;
         this.moduleNode = new ModuleNode(sourceUnit);
+        CharStream charStream = createCharStream(sourceUnit);
 
-        this.lexer = new GroovyLangLexer(createCharStream(sourceUnit));
-        this.parser =
-                new GroovyLangParser(
-                    new CommonTokenStream(this.lexer));
+        this.lexer = new GroovyLangLexer(charStream);
+        this.parser = new GroovyLangParser(new CommonTokenStream(this.lexer));
+        this.parser.setErrorHandler(new DescriptiveErrorStrategy(charStream));
 
-        this.parser.setErrorHandler(new DescriptiveErrorStrategy(this.lexer.getInputStream()));
-
-        this.tryWithResourcesASTTransformation = new TryWithResourcesASTTransformation(this);
         this.groovydocManager = new GroovydocManager(compilerConfiguration);
+        this.tryWithResourcesASTTransformation = new TryWithResourcesASTTransformation(this);
     }
 
     private CharStream createCharStream(SourceUnit sourceUnit) {
@@ -453,7 +430,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     public ModuleNode visitCompilationUnit(CompilationUnitContext ctx) {
         this.visit(ctx.packageDeclaration());
 
-        this.visitStatements(ctx.statements())
+        this.visitScriptStatements(ctx.scriptStatements())
                 .forEach(e -> {
                     if (e instanceof DeclarationListStatement) { // local variable declaration
                         ((DeclarationListStatement) e).getDeclarationStatements().forEach(moduleNode::addStatement);
@@ -485,12 +462,12 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     @Override
-    public List<ASTNode> visitStatements(StatementsContext ctx) {
+    public List<ASTNode> visitScriptStatements(ScriptStatementsContext ctx) {
         if (!asBoolean(ctx)) {
             return Collections.emptyList();
         }
 
-        return ctx.statement().stream()
+        return ctx.scriptStatement().stream()
                 .map(e -> (ASTNode) visit(e))
                 .collect(Collectors.toList());
     }
@@ -602,16 +579,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         visitingAssertStatementCnt--;
 
         return result;
-    }
-
-    @Override
-    public AssertStatement visitAssertStmtAlt(AssertStmtAltContext ctx) {
-        return configureAST(this.visitAssertStatement(ctx.assertStatement()), ctx);
-    }
-
-    @Override
-    public Statement visitConditionalStmtAlt(ConditionalStmtAltContext ctx) {
-        return configureAST(this.visitConditionalStatement(ctx.conditionalStatement()), ctx);
     }
 
     @Override
@@ -776,11 +743,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     @Override
-    public Statement visitTryCatchStmtAlt(TryCatchStmtAltContext ctx) {
-        return configureAST(this.visitTryCatchStatement(ctx.tryCatchStatement()), ctx);
-    }
-
-    @Override
     public Statement visitTryCatchStatement(TryCatchStatementContext ctx) {
         boolean resourcesExists = asBoolean(ctx.resources());
         boolean catchExists = asBoolean(ctx.catchClause());
@@ -810,7 +772,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                         configureAST(tryCatchStatement, ctx)),
                 ctx);
     }
-
 
     @Override
     public List<ExpressionStatement> visitResources(ResourcesContext ctx) {
@@ -904,7 +865,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                 .collect(Collectors.toList());
     }
 
-
     @Override
     public Statement visitFinallyBlock(FinallyBlockContext ctx) {
         if (!asBoolean(ctx)) {
@@ -915,8 +875,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                 this.createBlockStatement((Statement) this.visit(ctx.block())),
                 ctx);
     }
-
-
 
     @Override
     public SwitchStatement visitSwitchStatement(SwitchStatementContext ctx) {
@@ -963,9 +921,8 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         return result;
     }
 
-
     @Override
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     public List<Statement> visitSwitchBlockStatementGroup(SwitchBlockStatementGroupContext ctx) {
         int labelCnt = ctx.switchLabel().size();
         List<Token> firstLabelHolder = new ArrayList<>(1);
@@ -1035,11 +992,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     @Override
-    public ExpressionStatement visitExpressionStmtAlt(ExpressionStmtAltContext ctx) {
-        return (ExpressionStatement) this.visit(ctx.statementExpression());
-    }
-
-    @Override
     public ReturnStatement visitReturnStmtAlt(ReturnStmtAltContext ctx) {
         return configureAST(new ReturnStatement(asBoolean(ctx.expression())
                         ? (Expression) this.visit(ctx.expression())
@@ -1077,11 +1029,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     @Override
-    public BreakStatement visitBreakStmtAlt(BreakStmtAltContext ctx) {
-        return configureAST(this.visitBreakStatement(ctx.breakStatement()), ctx);
-    }
-
-    @Override
     public ContinueStatement visitContinueStatement(ContinueStatementContext ctx) {
         if (0 == visitingLoopStatementCnt) {
             throw createParsingFailedException("continue statement is only allowed inside loops", ctx);
@@ -1093,32 +1040,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
         return configureAST(new ContinueStatement(label), ctx);
 
-    }
-
-    @Override
-    public ContinueStatement visitContinueStmtAlt(ContinueStmtAltContext ctx) {
-        return configureAST(this.visitContinueStatement(ctx.continueStatement()), ctx);
-    }
-
-    @Override
-    public ImportNode visitImportStmtAlt(ImportStmtAltContext ctx) {
-        return configureAST(this.visitImportDeclaration(ctx.importDeclaration()), ctx);
-    }
-
-    @Override
-    public ClassNode visitTypeDeclarationStmtAlt(TypeDeclarationStmtAltContext ctx) {
-        return configureAST(this.visitTypeDeclaration(ctx.typeDeclaration()), ctx);
-    }
-
-
-    @Override
-    public Statement visitLocalVariableDeclarationStmtAlt(LocalVariableDeclarationStmtAltContext ctx) {
-        return configureAST(this.visitLocalVariableDeclaration(ctx.localVariableDeclaration()), ctx);
-    }
-
-    @Override
-    public MethodNode visitMethodDeclarationStmtAlt(MethodDeclarationStmtAltContext ctx) {
-        return configureAST(this.visitMethodDeclaration(ctx.methodDeclaration()), ctx);
     }
 
     // } statement    --------------------------------------------------------------------
@@ -1254,12 +1175,10 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
             classNodeList.add(classNode);
         }
 
-        int oldAnonymousInnerClassCounter = this.anonymousInnerClassCounter;
         classNodeStack.push(classNode);
         ctx.classBody().putNodeMetaData(CLASS_DECLARATION_CLASS_NODE, classNode);
         this.visitClassBody(ctx.classBody());
         classNodeStack.pop();
-        this.anonymousInnerClassCounter = oldAnonymousInnerClassCounter;
 
         if (!(asBoolean(ctx.CLASS()) || asBoolean(ctx.TRAIT()))) {
             classNodeList.add(classNode);
@@ -1278,22 +1197,22 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         classNode.addAnnotation(new AnnotationNode(ClassHelper.make(annotationClassName)));
     }
 
-    @SuppressWarnings({"unchecked"})
+    @SuppressWarnings("unchecked")
     private boolean containsDefaultMethods(ClassDeclarationContext ctx) {
         List<MethodDeclarationContext> methodDeclarationContextList =
                 (List<MethodDeclarationContext>) ctx.classBody().classBodyDeclaration().stream()
-                .map(ClassBodyDeclarationContext::memberDeclaration)
-                .filter(Objects::nonNull)
-                .map(e -> (Object) e.methodDeclaration())
-                .filter(Objects::nonNull).reduce(new LinkedList<MethodDeclarationContext>(), (r, e) -> {
-                    MethodDeclarationContext methodDeclarationContext = (MethodDeclarationContext) e;
+                        .map(ClassBodyDeclarationContext::memberDeclaration)
+                        .filter(Objects::nonNull)
+                        .map(e -> (Object) e.methodDeclaration())
+                        .filter(Objects::nonNull).reduce(new LinkedList<MethodDeclarationContext>(), (r, e) -> {
+                            MethodDeclarationContext methodDeclarationContext = (MethodDeclarationContext) e;
 
-                    if (createModifierManager(methodDeclarationContext).containsAny(DEFAULT)) {
-                        ((List) r).add(methodDeclarationContext);
-                    }
+                            if (createModifierManager(methodDeclarationContext).containsAny(DEFAULT)) {
+                                ((List) r).add(methodDeclarationContext);
+                            }
 
-                    return r;
-        });
+                            return r;
+                        });
 
         return !methodDeclarationContextList.isEmpty();
     }
@@ -1429,7 +1348,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                 ? configureAST(listExpression, ctx)
                 : configureAST(listExpression, anonymousInnerClassNode);
     }
-
 
     @Override
     public Void visitClassBodyDeclaration(ClassBodyDeclarationContext ctx) {
@@ -1640,7 +1558,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
         if (9 == ctx.ct) { // script
             if (isAbstractMethod || !hasMethodBody) { // method should not be declared abstract in the script
-                throw createParsingFailedException("You can not define a " + (isAbstractMethod ? "abstract" : "") + " method[" + methodNode.getName() + "] " + (!hasMethodBody ? "without method body" : "") + " in the script. Try " + (isAbstractMethod ? "removing the 'abstract'" : "") + (isAbstractMethod && !hasMethodBody ? " and" : "") + (!hasMethodBody ? " adding a method body" : ""), methodNode);
+                throw createParsingFailedException("You cannot define " + (isAbstractMethod ? "an abstract" : "a") + " method[" + methodNode.getName() + "] " + (!hasMethodBody ? "without method body " : "") + "in the script. Try " + (isAbstractMethod ? "removing the 'abstract'" : "") + (isAbstractMethod && !hasMethodBody ? " and" : "") + (!hasMethodBody ? " adding a method body" : ""), methodNode);
             }
         } else {
             if (4 == ctx.ct) { // trait
@@ -1650,12 +1568,12 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
             }
 
             if (!isAbstractMethod && !hasMethodBody) { // non-abstract method without body in the non-script(e.g. class, enum, trait) is not allowed!
-                throw createParsingFailedException("You defined a method[" + methodNode.getName() + "] without body. Try adding a method body, or declare it abstract", methodNode);
+                throw createParsingFailedException("You defined a method[" + methodNode.getName() + "] without a body. Try adding a method body, or declare it abstract", methodNode);
             }
 
             boolean isInterfaceOrAbstractClass = asBoolean(classNode) && classNode.isAbstract() && !classNode.isAnnotationDefinition();
             if (isInterfaceOrAbstractClass && !modifierManager.containsAny(DEFAULT) && isAbstractMethod && hasMethodBody) {
-                throw createParsingFailedException("You defined an abstract method[" + methodNode.getName() + "] with body. Try removing the method body" + (classNode.isInterface() ? ", or declare it default" : ""), methodNode);
+                throw createParsingFailedException("You defined an abstract method[" + methodNode.getName() + "] with a body. Try removing the method body" + (classNode.isInterface() ? ", or declare it default" : ""), methodNode);
             }
         }
 
@@ -1893,7 +1811,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
             int modifiers = modifierManager.getClassMemberModifiersOpValue();
 
-            Expression initialValue = EmptyExpression.INSTANCE.equals(declarationExpression.getRightExpression()) ? null : declarationExpression.getRightExpression();
+            Expression initialValue = declarationExpression.getRightExpression() instanceof EmptyExpression ? null : declarationExpression.getRightExpression();
             Object defaultValue = findDefaultValueByType(variableType);
 
             if (classNode.isInterface()) {
@@ -2095,23 +2013,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                 ctx);
     }
 
-/*
-    @Override
-    public Expression visitEnhancedExpression(EnhancedExpressionContext ctx) {
-        Expression expression;
-
-        if (asBoolean(ctx.expression())) {
-            expression = (Expression) this.visit(ctx.expression());
-        } else if (asBoolean(ctx.standardLambdaExpression())) {
-            expression = this.visitStandardLambdaExpression(ctx.standardLambdaExpression());
-        } else {
-            throw createParsingFailedException("Unsupported enhanced expression: " + ctx.getText(), ctx);
-        }
-
-        return configureAST(expression, ctx);
-    }
-*/
-
     @Override
     public ExpressionStatement visitCommandExprAlt(CommandExprAltContext ctx) {
         return configureAST(new ExpressionStatement(this.visitCommandExpression(ctx.commandExpression())), ctx);
@@ -2245,7 +2146,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         );
     }
 
-
     // expression {    --------------------------------------------------------------------
 
     @Override
@@ -2270,7 +2170,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
     @Override
     public Expression visitExpressionInPar(ExpressionInParContext ctx) {
-        //return this.visitEnhancedExpression(ctx.enhancedExpression());
         return this.visitEnhancedStatementExpression(ctx.enhancedStatementExpression());
     }
 
@@ -2289,12 +2188,9 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         return configureAST(expression, ctx);
     }
 
-
     @Override
     public Expression visitPathExpression(PathExpressionContext ctx) {
-        return //this.configureAST(
-                this.createPathExpression((Expression) this.visit(ctx.primary()), ctx.pathElement());
-                //ctx);
+        return this.createPathExpression((Expression) this.visit(ctx.primary()), ctx.pathElement());
     }
 
     @Override
@@ -2457,8 +2353,8 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
             // e.g. 1(), 1.1(), ((int) 1 / 2)(1, 2), {a, b -> a + b }(1, 2), m()()
             return configureAST(createCallMethodCallExpression(baseExpr, argumentsExpr), ctx);
-        } else if (asBoolean(ctx.closure())) {
-            ClosureExpression closureExpression = this.visitClosure(ctx.closure());
+        } else if (asBoolean(ctx.closureOrLambdaExpression())) {
+            ClosureExpression closureExpression = this.visitClosureOrLambdaExpression(ctx.closureOrLambdaExpression());
 
             if (baseExpr instanceof MethodCallExpression) {
                 MethodCallExpression methodCallExpression = (MethodCallExpression) baseExpr;
@@ -2815,11 +2711,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     @Override
-    public Expression visitPostfixExprAlt(PostfixExprAltContext ctx) {
-        return this.visitPostfixExpression(ctx.postfixExpression());
-    }
-
-    @Override
     public Expression visitUnaryNotExprAlt(UnaryNotExprAltContext ctx) {
         if (asBoolean(ctx.NOT())) {
             return configureAST(
@@ -2873,7 +2764,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                         String integerLiteralText = constantExpression.getNodeMetaData(INTEGER_LITERAL_TEXT);
                         if (null != integerLiteralText) {
 
-                            ConstantExpression result = new ConstantExpression(Numbers.parseInteger(null, SUB_STR + integerLiteralText));
+                            ConstantExpression result = new ConstantExpression(Numbers.parseInteger(SUB_STR + integerLiteralText));
 
                             this.numberFormatError = null; // reset the numberFormatError
 
@@ -3100,7 +2991,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                                 && Types.LEFT_SQUARE_BRACKET == ((BinaryExpression) leftExpr).getOperation().getType()) // e.g. map[a] = 123 OR map['a'] = 123 OR map["$a"] = 123
                 )
 
-                ) {
+            ) {
 
             throw createParsingFailedException("The LHS of an assignment should be a variable or a field accessing expression", ctx);
         }
@@ -3113,8 +3004,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                 ctx);
     }
 
-// } expression    --------------------------------------------------------------------
-
+    // } expression    --------------------------------------------------------------------
 
     // primary {       --------------------------------------------------------------------
     @Override
@@ -3132,16 +3022,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     @Override
-    public ConstantExpression visitLiteralPrmrAlt(LiteralPrmrAltContext ctx) {
-        return configureAST((ConstantExpression) this.visit(ctx.literal()), ctx);
-    }
-
-    @Override
-    public GStringExpression visitGstringPrmrAlt(GstringPrmrAltContext ctx) {
-        return configureAST((GStringExpression) this.visit(ctx.gstring()), ctx);
-    }
-
-    @Override
     public Expression visitNewPrmrAlt(NewPrmrAltContext ctx) {
         return configureAST(this.visitCreator(ctx.creator()), ctx);
     }
@@ -3156,41 +3036,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         return configureAST(new VariableExpression(ctx.SUPER().getText()), ctx);
     }
 
-
-    @Override
-    public Expression visitParenPrmrAlt(ParenPrmrAltContext ctx) {
-        return configureAST(this.visitParExpression(ctx.parExpression()), ctx);
-    }
-
-    @Override
-    public ClosureExpression visitClosurePrmrAlt(ClosurePrmrAltContext ctx) {
-        return configureAST(this.visitClosure(ctx.closure()), ctx);
-    }
-
-    @Override
-    public ClosureExpression visitLambdaPrmrAlt(LambdaPrmrAltContext ctx) {
-        return configureAST(this.visitStandardLambdaExpression(ctx.standardLambdaExpression()), ctx);
-    }
-
-    @Override
-    public ListExpression visitListPrmrAlt(ListPrmrAltContext ctx) {
-        return configureAST(
-                this.visitList(ctx.list()),
-                ctx);
-    }
-
-    @Override
-    public MapExpression visitMapPrmrAlt(MapPrmrAltContext ctx) {
-        return configureAST(this.visitMap(ctx.map()), ctx);
-    }
-
-    @Override
-    public VariableExpression visitBuiltInTypePrmrAlt(BuiltInTypePrmrAltContext ctx) {
-        return configureAST(this.visitBuiltInType(ctx.builtInType()), ctx);
-    }
-
-
-// } primary       --------------------------------------------------------------------
+    // } primary       --------------------------------------------------------------------
 
     @Override
     public Expression visitCreator(CreatorContext ctx) {
@@ -3295,34 +3141,36 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         return arrayType;
     }
 
+    private static String nextAnonymousClassName(ClassNode outerClass) {
+        int anonymousClassCount = 0;
+        for (Iterator<InnerClassNode> it = outerClass.getInnerClasses(); it.hasNext();) {
+            InnerClassNode innerClass = it.next();
+            if (innerClass.isAnonymous()) {
+                anonymousClassCount += 1;
+            }
+        }
 
-    private String genAnonymousClassName(String outerClassName) {
-        return outerClassName + "$" + this.anonymousInnerClassCounter++;
+        return outerClass.getName() + "$" + (anonymousClassCount + 1);
     }
 
     @Override
     public InnerClassNode visitAnonymousInnerClassDeclaration(AnonymousInnerClassDeclarationContext ctx) {
-        ClassNode superClass = ctx.getNodeMetaData(ANONYMOUS_INNER_CLASS_SUPER_CLASS);
-        Objects.requireNonNull(superClass, "superClass should not be null");
+        ClassNode superClass = Objects.requireNonNull(ctx.getNodeMetaData(ANONYMOUS_INNER_CLASS_SUPER_CLASS), "superClass should not be null");
+        ClassNode outerClass = Optional.ofNullable(classNodeStack.peek()).orElse(moduleNode.getScriptClassDummy());
+        String innerClassName = nextAnonymousClassName(outerClass);
 
         InnerClassNode anonymousInnerClass;
-
-        ClassNode outerClass = this.classNodeStack.peek();
-        outerClass = asBoolean(outerClass) ? outerClass : moduleNode.getScriptClassDummy();
-
-        String fullName = this.genAnonymousClassName(outerClass.getName());
         if (1 == ctx.t) { // anonymous enum
-            anonymousInnerClass = new EnumConstantClassNode(outerClass, fullName, superClass.getModifiers() | Opcodes.ACC_FINAL, superClass.getPlainNodeReference());
-
+            anonymousInnerClass = new EnumConstantClassNode(outerClass, innerClassName, superClass.getModifiers() | Opcodes.ACC_FINAL, superClass.getPlainNodeReference());
             // and remove the final modifier from classNode to allow the sub class
             superClass.setModifiers(superClass.getModifiers() & ~Opcodes.ACC_FINAL);
         } else { // anonymous inner class
-            anonymousInnerClass = new InnerClassNode(outerClass, fullName, Opcodes.ACC_PUBLIC, superClass);
+            anonymousInnerClass = new InnerClassNode(outerClass, innerClassName, Opcodes.ACC_PUBLIC, superClass);
         }
 
         anonymousInnerClass.setUsingGenerics(false);
         anonymousInnerClass.setAnonymous(true);
-        anonymousInnerClass.putNodeMetaData(CLASS_NAME, fullName);
+        anonymousInnerClass.putNodeMetaData(CLASS_NAME, innerClassName);
         configureAST(anonymousInnerClass, ctx);
 
         classNodeStack.push(anonymousInnerClass);
@@ -3334,7 +3182,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
         return anonymousInnerClass;
     }
-
 
     @Override
     public ClassNode visitCreatedName(CreatedNameContext ctx) {
@@ -3363,7 +3210,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
         return classNode;
     }
-
 
     @Override
     public MapExpression visitMap(MapContext ctx) {
@@ -3434,13 +3280,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     public ConstantExpression visitKeywords(KeywordsContext ctx) {
         return configureAST(new ConstantExpression(ctx.getText()), ctx);
     }
-
-    /*
-    @Override
-    public VariableExpression visitIdentifier(IdentifierContext ctx) {
-        return this.configureAST(new VariableExpression(ctx.getText()), ctx);
-    }
-    */
 
     @Override
     public VariableExpression visitBuiltInType(BuiltInTypeContext ctx) {
@@ -3513,15 +3352,15 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         }
     }
 
-
     // literal {       --------------------------------------------------------------------
+
     @Override
     public ConstantExpression visitIntegerLiteralAlt(IntegerLiteralAltContext ctx) {
         String text = ctx.IntegerLiteral().getText();
 
         Number num = null;
         try {
-            num = Numbers.parseInteger(null, text);
+            num = Numbers.parseInteger(text);
         } catch (Exception e) {
             this.numberFormatError = tuple(ctx, e);
         }
@@ -3552,13 +3391,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     @Override
-    public ConstantExpression visitStringLiteralAlt(StringLiteralAltContext ctx) {
-        return configureAST(
-                this.visitStringLiteral(ctx.stringLiteral()),
-                ctx);
-    }
-
-    @Override
     public ConstantExpression visitBooleanLiteralAlt(BooleanLiteralAltContext ctx) {
         return configureAST(new ConstantExpression("true".equals(ctx.BooleanLiteral().getText()), true), ctx);
     }
@@ -3568,11 +3400,10 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         return configureAST(new ConstantExpression(null), ctx);
     }
 
-
-// } literal       --------------------------------------------------------------------
-
+    // } literal       --------------------------------------------------------------------
 
     // gstring {       --------------------------------------------------------------------
+
     @Override
     public GStringExpression visitGstring(GstringContext ctx) {
         final List<ConstantExpression> stringLiteralList = new LinkedList<>();
@@ -3592,7 +3423,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                 .map(e -> {
                     Expression expression = this.visitGstringValue(e);
 
-                    if (expression instanceof ClosureExpression && !asBoolean(e.closure().ARROW())) {
+                    if (expression instanceof ClosureExpression && !hasArrow(e)) {
                         List<Statement> statementList = ((BlockStatement) ((ClosureExpression) expression).getCode()).getStatements();
 
                         if (statementList.stream().noneMatch(DefaultGroovyMethods::asBoolean)) {
@@ -3624,6 +3455,10 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         }
 
         return configureAST(new GStringExpression(verbatimText.toString(), stringLiteralList, values), ctx);
+    }
+
+    private boolean hasArrow(GstringValueContext e) {
+        return asBoolean(e.closure().ARROW());
     }
 
     private String parseGStringEnd(GstringContext ctx, String beginQuotation) {
@@ -3698,7 +3533,8 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
         return configureAST(variableExpression, ctx);
     }
-// } gstring       --------------------------------------------------------------------
+
+    // } gstring       --------------------------------------------------------------------
 
     @Override
     public LambdaExpression visitStandardLambdaExpression(StandardLambdaExpressionContext ctx) {
@@ -3854,7 +3690,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                 .collect(Collectors.toList());
     }
 
-
     @Override
     public ModifierNode visitClassOrInterfaceModifier(ClassOrInterfaceModifierContext ctx) {
         if (asBoolean(ctx.annotation())) {
@@ -3896,7 +3731,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
         return Collections.emptyList();
     }
-
 
     @Override
     public ModifierNode visitVariableModifier(VariableModifierContext ctx) {
@@ -3949,6 +3783,7 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     }
 
     // type {       --------------------------------------------------------------------
+
     @Override
     public ClassNode visitType(TypeContext ctx) {
         if (!asBoolean(ctx)) {
@@ -4068,7 +3903,8 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     public ClassNode visitPrimitiveType(PrimitiveTypeContext ctx) {
         return configureAST(ClassHelper.make(ctx.getText()), ctx);
     }
-// } type       --------------------------------------------------------------------
+
+    // } type       --------------------------------------------------------------------
 
     @Override
     public VariableExpression visitVariableDeclaratorId(VariableDeclaratorIdContext ctx) {
@@ -4084,6 +3920,19 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                                 .collect(Collectors.toList())
                 ),
                 ctx);
+    }
+
+    @Override
+    public ClosureExpression visitClosureOrLambdaExpression(ClosureOrLambdaExpressionContext ctx) {
+        // GROOVY-8991: Difference in behaviour with closure and lambda
+        if (asBoolean(ctx.closure())) {
+            return configureAST(this.visitClosure(ctx.closure()), ctx);
+        } else if (asBoolean(ctx.standardLambdaExpression())) {
+            return configureAST(this.visitStandardLambdaExpression(ctx.standardLambdaExpression()), ctx);
+        }
+
+        // should never reach here
+        throw createParsingFailedException("The node is not expected here" + ctx.getText(), ctx);
     }
 
     @Override
@@ -4172,7 +4021,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
         return annotationElementValues;
     }
 
-
     @Override
     public String visitAnnotationName(AnnotationNameContext ctx) {
         return this.visitQualifiedClassName(ctx.qualifiedClassName()).getName();
@@ -4228,7 +4076,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     public String visitIdentifier(IdentifierContext ctx) {
         return ctx.getText();
     }
-
 
     @Override
     public String visitQualifiedName(QualifiedNameContext ctx) {
@@ -4302,7 +4149,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
         return super.visit(tree);
     }
-
 
     // e.g. obj.a(1, 2) or obj.a 1, 2
     private MethodCallExpression createMethodCallExpression(PropertyExpression propertyExpression, Expression arguments) {
@@ -4638,7 +4484,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
                         node.getLastColumnNumber()));
     }
 
-
     private CompilationFailedException createParsingFailedException(String msg, TerminalNode node) {
         return createParsingFailedException(msg, node.getSymbol());
     }
@@ -4760,7 +4605,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
     private final ModuleNode moduleNode;
     private final SourceUnit sourceUnit;
-    private final CompilerConfiguration compilerConfiguration;
     private final GroovyLangLexer lexer;
     private final GroovyLangParser parser;
     private final TryWithResourcesASTTransformation tryWithResourcesASTTransformation;
@@ -4768,7 +4612,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
     private final List<ClassNode> classNodeList = new LinkedList<>();
     private final Deque<ClassNode> classNodeStack = new ArrayDeque<>();
     private final Deque<List<InnerClassNode>> anonymousInnerClassesDefinedInMethodStack = new ArrayDeque<>();
-    private int anonymousInnerClassCounter = 1;
 
     private Tuple2<GroovyParserRuleContext, Exception> numberFormatError;
 
@@ -4810,7 +4653,6 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
     private static final String GROOVY_TRANSFORM_TRAIT = "groovy.transform.Trait";
     private static final Set<String> PRIMITIVE_TYPE_SET = Collections.unmodifiableSet(new HashSet<>(Arrays.asList("boolean", "char", "byte", "short", "int", "long", "float", "double")));
-    private static final Logger LOGGER = Logger.getLogger(AstBuilder.class.getName());
 
     private static final String INSIDE_PARENTHESES_LEVEL = "_INSIDE_PARENTHESES_LEVEL";
 
@@ -4836,3 +4678,4 @@ public class AstBuilder extends GroovyParserBaseVisitor<Object> implements Groov
 
     private static final String CLASS_NAME = "_CLASS_NAME";
 }
+

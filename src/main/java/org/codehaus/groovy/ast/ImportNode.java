@@ -22,17 +22,12 @@ import org.objectweb.asm.Opcodes;
 
 /**
  * Represents an import statement of a single class
- *
- * @author Jochen Theodorou
- * @author Paul King
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class ImportNode extends AnnotatedNode implements Opcodes {
 
     private final ClassNode type;
     private final String alias;
     private final String fieldName;
-    // TODO use PackageNode instead here?
     private final String packageName;
     private final boolean isStar;
     private final boolean isStatic;
@@ -108,12 +103,12 @@ public class ImportNode extends AnnotatedNode implements Opcodes {
             return "import static " + typeName + ".*";
         }
         if (isStatic) {
-            if (alias != null && alias.length() != 0 && !alias.equals(fieldName)) {
+            if (alias != null && !alias.isEmpty() && !alias.equals(fieldName)) {
                 return "import static " + typeName + "." + fieldName + " as " + alias;
             }
             return "import static " + typeName + "." + fieldName;
         }
-        if (alias == null || alias.length() == 0) {
+        if (alias == null || alias.isEmpty()) {
             return "import " + typeName;
         }
         return "import " + typeName + " as " + alias;

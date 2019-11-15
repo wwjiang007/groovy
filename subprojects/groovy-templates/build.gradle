@@ -16,13 +16,33 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
+repositories {
+    maven {
+        url 'https://oss.sonatype.org/content/repositories/snapshots'
+    }
+}
+
 dependencies {
-    compile rootProject
-    compile project(':groovy-xml')
-    testCompile rootProject.sourceSets.test.runtimeClasspath
-    testCompile project(':groovy-test')
-    testCompile("org.spockframework:spock-core:$spockVersion") {
-        exclude group: 'org.codehaus.groovy'
+    implementation rootProject
+    api project(':groovy-xml')
+    testImplementation rootProject.sourceSets.test.runtimeClasspath
+    testImplementation project(':groovy-test')
+    // temporarily disable spock tests since it doesn't support 4 yet
+    if (!spockVersion.startsWith('1.3') || !groovyVersion.startsWith('4')) {
+        testImplementation ("org.spockframework:spock-core:$spockVersion") {
+            exclude group: 'org.codehaus.groovy'
+        }
+    }
+}
+
+// temporarily disable spock tests since it doesn't support 4 yet
+if (spockVersion.startsWith('1.3') && groovyVersion.startsWith('4')) {
+    sourceSets {
+        test {
+            groovy {
+                exclude 'groovy/text/StreamingTemplateEngineSpecification.groovy'
+            }
+        }
     }
 }
 

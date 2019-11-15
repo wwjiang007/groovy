@@ -18,12 +18,12 @@
  */
 package org.codehaus.groovy.ant;
 
+import groovy.ant.AntBuilder;
 import groovy.lang.Binding;
 import groovy.lang.GroovyClassLoader;
 import groovy.lang.GroovyShell;
 import groovy.lang.MissingMethodException;
 import groovy.lang.Script;
-import groovy.util.AntBuilder;
 import org.apache.groovy.io.StringBuilderWriter;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.Project;
@@ -36,6 +36,7 @@ import org.apache.tools.ant.util.FileUtils;
 import org.codehaus.groovy.control.CompilationFailedException;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.customizers.ImportCustomizer;
+import org.codehaus.groovy.reflection.ReflectionUtils;
 import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
 import org.codehaus.groovy.tools.ErrorReporter;
@@ -430,7 +431,7 @@ public class Groovy extends Java {
             try {
                 final Object propsHandler = project.getClass().getMethod("getPropsHandler").invoke(project);
                 final Field contextField = propsHandler.getClass().getDeclaredField("context");
-                contextField.setAccessible(true);
+                ReflectionUtils.trySetAccessible(contextField);
                 final Object context = contextField.get(propsHandler);
                 mavenPom = InvokerHelper.invokeMethod(context, "getProject", EMPTY_OBJECT_ARRAY);
             }
@@ -451,12 +452,7 @@ public class Groovy extends Java {
         final String scriptName = computeScriptName();
         final GroovyClassLoader classLoader =
                 AccessController.doPrivileged(
-                        new PrivilegedAction<GroovyClassLoader>() {
-                            @Override
-                            public GroovyClassLoader run() {
-                                return new GroovyClassLoader(baseClassLoader);
-                            }
-                        });
+                        (PrivilegedAction<GroovyClassLoader>) () -> new GroovyClassLoader(baseClassLoader));
         addClassPathes(classLoader);
         configureCompiler();
         final GroovyShell groovy = new GroovyShell(classLoader, new Binding(), configuration);

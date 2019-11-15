@@ -24,6 +24,7 @@ import org.codehaus.groovy.reflection.GeneratedMetaMethod;
 import org.codehaus.groovy.util.FastArray;
 import org.codehaus.groovy.util.SingleKeyHashMap;
 
+import java.util.Arrays;
 import java.util.NoSuchElementException;
 import java.util.Objects;
 
@@ -118,8 +119,7 @@ public class MetaMethodIndex {
 
     public void clear() {
         Object[] tab = table;
-        for (int i = 0; i < tab.length; i++)
-            tab[i] = null;
+        Arrays.fill(tab, null);
         size = 0;
     }
 
@@ -487,8 +487,8 @@ public class MetaMethodIndex {
         Entry[] table = this.table;
         int length = table.length;
 
-        for (int j = 0; j < length; j++) {
-            for (Entry e = table[j]; e != null; e = e.nextHashEntry) {
+        for (Entry entry : table) {
+            for (Entry e = entry; e != null; e = e.nextHashEntry) {
                 if (e.methods instanceof FastArray)
                     e.methodsForSuper = ((FastArray) e.methods).copy();
                 else

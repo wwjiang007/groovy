@@ -18,9 +18,12 @@
  */
 package groovy.bugs
 
-import gls.CompilableTestSupport
+import groovy.test.GroovyTestCase
+import groovy.transform.CompileStatic
 
-class Groovy8609Bug extends CompilableTestSupport {
+@CompileStatic
+final class Groovy8609Bug extends GroovyTestCase {
+
     void testUpperBoundWithGenerics() {
         assertScript '''
         @groovy.transform.CompileStatic
@@ -96,7 +99,7 @@ class Groovy8609Bug extends CompilableTestSupport {
         }
         '''
 
-        assert errMsg.contains('[Static type checking] - Cannot call A <ArrayList, HashMap>#getFirstRecord(T) with arguments [java.util.ArrayList <TreeMap>]')
+        assert errMsg.contains('[Static type checking] - Cannot find matching method A#getFirstRecord(java.util.ArrayList <TreeMap>)')
     }
 
     void testUpperBoundWithGenericsThroughWrongType2() {
@@ -117,8 +120,7 @@ class Groovy8609Bug extends CompilableTestSupport {
         }
         '''
 
-        // TODO we should print generics details, e.g. [Static type checking] - Cannot call A <ArrayList, HashMap<String, Integer>>#getFirstRecord(T) with arguments [java.util.ArrayList <HashMap<String, Long>>]
-        assert errMsg.contains('[Static type checking] - Cannot call A <ArrayList, HashMap>#getFirstRecord(T) with arguments [java.util.ArrayList <HashMap>]')
+        assert errMsg.contains('[Static type checking] - Cannot find matching method A#getFirstRecord(java.util.ArrayList <HashMap>)')
     }
 
     void testUpperBoundWithGenericsThroughWrongType3() {
@@ -139,7 +141,6 @@ class Groovy8609Bug extends CompilableTestSupport {
         }
         '''
 
-        // TODO we should print generics details, e.g. [Static type checking] - Cannot call A <ArrayList, HashMap<String, Integer>>#getFirstRecord(T) with arguments [java.util.ArrayList <HashMap<StringBuffer, Integer>>]
-        assert errMsg.contains('[Static type checking] - Cannot call A <ArrayList, HashMap>#getFirstRecord(T) with arguments [java.util.ArrayList <HashMap>]')
+        assert errMsg.contains('[Static type checking] - Cannot find matching method A#getFirstRecord(java.util.ArrayList <HashMap>)')
     }
 }

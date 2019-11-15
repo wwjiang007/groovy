@@ -19,9 +19,6 @@
 package groovy.text.markup
 
 import groovy.transform.CompileStatic
-import org.codehaus.groovy.antlr.AntlrParserPlugin
-import org.codehaus.groovy.antlr.parser.GroovyLexer
-import org.codehaus.groovy.antlr.parser.GroovyRecognizer
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ClassCodeExpressionTransformer
 import org.codehaus.groovy.ast.ClassHelper
@@ -39,17 +36,15 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression
 import org.codehaus.groovy.ast.expr.TupleExpression
 import org.codehaus.groovy.ast.expr.VariableExpression
 import org.codehaus.groovy.ast.stmt.EmptyStatement
+import org.codehaus.groovy.ast.tools.Antlr4Utils
+import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.ResolveVisitor
 import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.control.messages.SyntaxErrorMessage
-import org.codehaus.groovy.syntax.ParserException
-import org.codehaus.groovy.syntax.Reduction
 import org.codehaus.groovy.syntax.SyntaxException
 import org.codehaus.groovy.syntax.Types
 import org.codehaus.groovy.transform.stc.GroovyTypeCheckingExtensionSupport
 import org.codehaus.groovy.transform.stc.TypeCheckingContext
-
-import java.util.concurrent.atomic.AtomicReference
 
 import static org.codehaus.groovy.ast.ClassHelper.OBJECT_TYPE
 import static org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport.isAssignment
@@ -59,8 +54,6 @@ import static org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport.isAssi
  * calls into direct calls to {@link BaseTemplate#methodMissing(java.lang.String, java.lang.Object)}
  * for faster rendering.</p>
  * <p>This extension also supports optional type checking of the model</p>
- *
- * @author Cedric Champeau
  */
 class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSupport.TypeCheckingDSL {
 
@@ -70,7 +63,7 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
 
         beforeVisitClass { classNode ->
             def modelTypes = MarkupTemplateEngine.TemplateGroovyClassLoader.modelTypes.get()
-            if (modelTypes!=null) {
+            if (modelTypes != null) {
                 modelTypesClassNodes = [:]
                 modelTypes.each { k, v ->
                     modelTypesClassNodes[k] = buildNodeFromString(v, context)
@@ -78,13 +71,13 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
             }
             def modelTypesFromTemplate = classNode.getNodeMetaData(MarkupTemplateEngine.MODELTYPES_ASTKEY)
             if (modelTypesFromTemplate) {
-                if (modelTypesClassNodes==null) {
+                if (modelTypesClassNodes == null) {
                     modelTypesClassNodes = modelTypesFromTemplate
                 } else {
                     modelTypesClassNodes.putAll(modelTypesFromTemplate)
                 }
             }
-            if (modelTypesClassNodes==null) {
+            if (modelTypesClassNodes == null) {
                 // push a new error collector, we want type checking errors to be silent
                 context.pushErrorCollector()
             }
@@ -97,16 +90,16 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
             }
         }
         methodNotFound { receiver, name, argList, argTypes, call ->
-            if ("getAt"==name && OBJECT_TYPE==receiver) {
+            if ("getAt" == name && OBJECT_TYPE == receiver) {
                 // GROOVY-6940
                 def enclosingBinaryExpression = context.enclosingBinaryExpression
                 if (enclosingBinaryExpression.leftExpression.is(call.objectExpression)) {
                     def stack = context.enclosingBinaryExpressionStack
-                    if (stack.size()>1) {
+                    if (stack.size() > 1) {
                         def superEnclosing = stack.get(1)
                         def opType = superEnclosing.operation.type
                         if (superEnclosing.leftExpression.is(enclosingBinaryExpression) && isAssignment(opType)) {
-                            if (opType== Types.ASSIGN) {
+                            if (opType == Types.ASSIGN) {
                                 // type checker looks for getAt() but we need to replace the super binary expression with a putAt
                                 // foo[x] = y --> foo.putAt(x,y)
                                 def mce = new MethodCallExpression(
@@ -130,7 +123,7 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
                     currentScope.builderCalls << call
                     return makeDynamic(call, OBJECT_TYPE)
                 }
-                if (modelTypesClassNodes==null) {
+                if (modelTypesClassNodes == null) {
                     // unchecked mode
                     return makeDynamic(call, OBJECT_TYPE)
                 }
@@ -138,15 +131,15 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
         }
 
         onMethodSelection { call, node ->
-            if (isMethodCallExpression(call) && modelTypesClassNodes!=null) {
+            if (isMethodCallExpression(call) && modelTypesClassNodes != null) {
                 def args = getArguments(call).expressions
-                if (args.size()==1) {
-                    String varName = isConstantExpression(args[0])?args[0].text:call.getNodeMetaData(MarkupBuilderCodeTransformer.TARGET_VARIABLE)
+                if (args.size() == 1) {
+                    String varName = isConstantExpression(args[0]) ? args[0].text : call.getNodeMetaData(MarkupBuilderCodeTransformer.TARGET_VARIABLE)
                     def type = modelTypesClassNodes[varName]
                     if (type) {
-                        if (call.objectExpression.text=='this.getModel()') {
+                        if (call.objectExpression.text == 'this.getModel()') {
                             storeType(call, type)
-                        } else if (call.methodAsString=='tryEscape') {
+                        } else if (call.methodAsString == 'tryEscape') {
                             storeType(call, type)
                         }
                     }
@@ -155,8 +148,8 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
         }
 
         unresolvedProperty { pexp ->
-            if (pexp.objectExpression.text=='this.getModel()') {
-                if (modelTypesClassNodes!=null) {
+            if (pexp.objectExpression.text == 'this.getModel()') {
+                if (modelTypesClassNodes != null) {
                     // type checked mode detected!
                     def type = modelTypesClassNodes[pexp.propertyAsString]
                     if (type) {
@@ -165,7 +158,7 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
                 } else {
                     makeDynamic(pexp)
                 }
-            } else if (modelTypesClassNodes==null) {
+            } else if (modelTypesClassNodes == null) {
                 // dynamic mode
                 makeDynamic(pexp)
             }
@@ -180,23 +173,9 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
 
     @CompileStatic
     private static ClassNode buildNodeFromString(String option, TypeCheckingContext ctx) {
-        GroovyLexer lexer = new GroovyLexer(new StringReader(option))
-        final GroovyRecognizer rn = GroovyRecognizer.make(lexer)
-        rn.classOrInterfaceType(true);
-        final AtomicReference<ClassNode> ref = new AtomicReference<ClassNode>();
-        AntlrParserPlugin plugin = new AntlrParserPlugin() {
-            @Override
-            public ModuleNode buildAST(
-                    final SourceUnit sourceUnit,
-                    final ClassLoader classLoader, final Reduction cst) throws ParserException {
-                ref.set(makeTypeWithArguments(rn.getAST()));
-                return null;
-            }
-        };
-        plugin.buildAST(null, null, null);
-        ClassNode parsedNode = ref.get();
-        ClassNode dummyClass = new ClassNode("dummy", 0, ClassHelper.OBJECT_TYPE);
-        dummyClass.setModule(new ModuleNode(ctx.source));
+        ClassNode parsedNode = Antlr4Utils.parse(option, CompilerConfiguration.DEFAULT)
+        ClassNode dummyClass = new ClassNode("dummy", 0, OBJECT_TYPE)
+        dummyClass.setModule(new ModuleNode(ctx.source))
         MethodNode dummyMN = new MethodNode(
                 "dummy",
                 0,
@@ -205,18 +184,18 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
                 ClassNode.EMPTY_ARRAY,
                 EmptyStatement.INSTANCE
         )
-        dummyClass.addMethod(dummyMN);
+        dummyClass.addMethod(dummyMN)
         ResolveVisitor visitor = new ResolveVisitor(ctx.compilationUnit) {
             @Override
-            public void addError(final String msg, final ASTNode expr) {
+            void addError(final String msg, final ASTNode expr) {
                 ctx.errorCollector.addErrorAndContinue(new SyntaxErrorMessage(
-                        new SyntaxException(msg + '\n', expr.getLineNumber(), expr.getColumnNumber(), expr.getLastLineNumber(), expr.getLastColumnNumber()),
+                        new SyntaxException(msg + '\n', expr.lineNumber, expr.columnNumber, expr.lastLineNumber, expr.lastColumnNumber),
                         ctx.source)
-                );
+                )
             }
-        };
+        }
         visitor.startResolving(dummyClass, ctx.source)
-        return dummyMN.getReturnType()
+        return dummyMN.returnType
     }
 
     private static class BuilderMethodReplacer extends ClassCodeExpressionTransformer {
@@ -259,7 +238,7 @@ class MarkupTemplateTypeCheckingExtension extends GroovyTypeCheckingExtensionSup
                                 new ConstantExpression(exp.getMethodAsString()),
                                 new ArrayExpression(
                                         OBJECT_TYPE,
-                                        [* args]
+                                        [*args]
                                 )
                         )
                 )

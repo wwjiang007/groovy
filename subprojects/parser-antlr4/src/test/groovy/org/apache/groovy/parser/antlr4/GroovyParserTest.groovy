@@ -18,6 +18,7 @@
  */
 package org.apache.groovy.parser.antlr4
 
+import groovy.test.GroovyTestCase
 import org.apache.groovy.parser.antlr4.util.ASTComparatorCategory
 import org.codehaus.groovy.ast.ClassNode
 import org.codehaus.groovy.ast.FieldNode
@@ -438,5 +439,7 @@ class GroovyParserTest extends GroovyTestCase {
         doTest('bugs/BUG-GROOVY-8511.groovy')
         doRunAndTestAntlr4('bugs/BUG-GROOVY-8613.groovy')
         doTest('bugs/BUG-GROOVY-8641.groovy')
+        doTest('bugs/BUG-GROOVY-8913.groovy')
+        doRunAndTestAntlr4('bugs/BUG-GROOVY-8991.groovy')
     }
 }

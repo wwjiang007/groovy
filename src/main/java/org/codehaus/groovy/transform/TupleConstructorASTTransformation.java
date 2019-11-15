@@ -48,7 +48,6 @@ import org.codehaus.groovy.control.SourceUnit;
 
 import java.lang.annotation.Annotation;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -73,6 +72,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.equalsNullX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getAllProperties;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ifElseS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ifS;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.nullX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.params;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.propX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
@@ -247,12 +247,8 @@ public class TupleConstructorASTTransformation extends AbstractASTTransformation
         }
 
         if (includes != null) {
-            Comparator<Parameter> includeComparator = new Comparator<Parameter>() {
-                public int compare(Parameter p1, Parameter p2) {
-                    return Integer.compare(includes.indexOf(p1.getName()), includes.indexOf(p2.getName()));
-                }
-            };
-            Collections.sort(params, includeComparator);
+            Comparator<Parameter> includeComparator = Comparator.comparingInt(p -> includes.indexOf(p.getName()));
+            params.sort(includeComparator);
         }
 
         boolean hasMapCons = AnnotatedNodeUtils.hasAnnotation(cNode, MapConstructorASTTransformation.MY_TYPE);
@@ -298,12 +294,16 @@ public class TupleConstructorASTTransformation extends AbstractASTTransformation
     }
 
     private static Expression providedOrDefaultInitialValue(FieldNode fNode) {
-        Expression initialExp = fNode.getInitialExpression() != null ? fNode.getInitialExpression() : ConstantExpression.NULL;
+        Expression initialExp = fNode.getInitialExpression() != null ? fNode.getInitialExpression() : nullX();
         final ClassNode paramType = fNode.getType();
-        if (ClassHelper.isPrimitiveType(paramType) && initialExp.equals(ConstantExpression.NULL)) {
+        if (ClassHelper.isPrimitiveType(paramType) && isNull(initialExp)) {
             initialExp = primitivesInitialValues.get(paramType.getTypeClass());
         }
         return initialExp;
+    }
+
+    private static boolean isNull(Expression exp) {
+        return exp instanceof ConstantExpression && ((ConstantExpression) exp).isNullExpression();
     }
 
     public static void addSpecialMapConstructors(int modifiers, ClassNode cNode, String message, boolean addNoArg) {

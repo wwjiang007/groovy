@@ -93,7 +93,6 @@ import java.util.List;
  * where for example it is necessary to check the parent nodes of an AST node before
  * performing some operations.
  *
- * @author Cedric Champeau
  * @since 2.5.0
  */
 public abstract class ContextualClassCodeVisitor extends ClassCodeVisitorSupport {
@@ -546,7 +545,7 @@ public abstract class ContextualClassCodeVisitor extends ClassCodeVisitorSupport
     }
 
     @Override
-    protected void visitEmptyStatement(final EmptyStatement statement) {
+    public void visitEmptyStatement(final EmptyStatement statement) {
         pushContext(statement);
         super.visitEmptyStatement(statement);
         popContext();

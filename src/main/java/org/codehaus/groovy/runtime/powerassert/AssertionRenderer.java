@@ -21,14 +21,10 @@ package org.codehaus.groovy.runtime.powerassert;
 import org.codehaus.groovy.runtime.InvokerHelper;
 
 import java.util.ArrayList;
-import java.util.Collections;
-import java.util.Comparator;
 import java.util.List;
 
 /**
  * Creates a string representation of an assertion and its recorded values.
- *
- * @author Peter Niederwieser
  */
 public final class AssertionRenderer {
     private final String text;
@@ -74,13 +70,7 @@ public final class AssertionRenderer {
     private void sortValues() {
         // it's important to use a stable sort here, otherwise
         // renderValues() will skip the wrong values
-        Collections.sort(recorder.getValues(),
-                new Comparator<Value>() {
-                    public int compare(Value v1, Value v2) {
-                        return v2.getColumn() - v1.getColumn();
-                    }
-                }
-        );
+        recorder.getValues().sort((v1, v2) -> v2.getColumn() - v1.getColumn());
     }
 
     private void renderValues() {

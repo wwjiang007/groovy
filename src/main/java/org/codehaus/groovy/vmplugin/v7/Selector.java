@@ -50,6 +50,7 @@ import org.codehaus.groovy.runtime.metaclass.NewInstanceMetaMethod;
 import org.codehaus.groovy.runtime.metaclass.NewStaticMetaMethod;
 import org.codehaus.groovy.runtime.metaclass.ReflectionMetaMethod;
 import org.codehaus.groovy.runtime.wrappers.Wrapper;
+import org.codehaus.groovy.vmplugin.VMPluginFactory;
 import org.codehaus.groovy.vmplugin.v7.IndyInterface.CALL_TYPES;
 
 import java.lang.invoke.MethodHandle;
@@ -325,7 +326,7 @@ public abstract class Selector {
                 insertName = true;
             } else if (res instanceof CachedField) {
                 CachedField cf = (CachedField) res;
-                Field f = cf.field;
+                Field f = cf.getCachedField();
                 try {
                     handle = LOOKUP.unreflectGetter(f);
                     if (Modifier.isStatic(f.getModifiers())) {
@@ -395,9 +396,10 @@ public abstract class Selector {
          * For a constructor call we always use the static meta class from the registry
          */
         @Override
-        public void getMetaClass() {
+        public MetaClass getMetaClass() {
             Object receiver = args[0];
             mc = GroovySystem.getMetaClassRegistry().getMetaClass((Class) receiver);
+            return mc;
         }
 
         /**
@@ -428,7 +430,7 @@ public abstract class Selector {
                 if (LOG_ENABLED) LOG.info("meta method is MetaConstructor instance");
                 MetaConstructor mc = (MetaConstructor) method;
                 isVargs = mc.isVargsMethod();
-                Constructor con = mc.getCachedConstrcutor().cachedConstructor;
+                Constructor con = mc.getCachedConstrcutor().getCachedConstructor();
                 try {
                     handle = LOOKUP.unreflectConstructor(con);
                     if (LOG_ENABLED) LOG.info("successfully unreflected constructor");
@@ -497,7 +499,6 @@ public abstract class Selector {
      * Method invocation based {@link Selector}.
      * This Selector is called for method invocations and is base for cosntructor
      * calls as well as getProperty calls.
-     * @author <a href="mailto:blackdrag@gmx.org">Jochen "blackdrag" Theodorou</a>
      */
     private static class MethodSelector extends Selector {
         protected MetaClass mc;
@@ -555,7 +556,7 @@ public abstract class Selector {
         /**
          * Gives the meta class to an Object.
          */
-        public void getMetaClass() {
+        public MetaClass getMetaClass() {
             Object receiver = args[0];
             if (receiver == null) {
                 mc = NullObject.getNullObject().getMetaClass();
@@ -574,6 +575,8 @@ public abstract class Selector {
                 this.cache &= !ClassInfo.getClassInfo(receiver.getClass()).hasPerInstanceMetaClasses();
             }
             mc.initialize();
+
+            return mc;
         }
 
         /**
@@ -607,10 +610,8 @@ public abstract class Selector {
             MetaMethod metaMethod = method;
             isCategoryMethod = method instanceof CategoryMethod;
 
-            if (
-                    metaMethod instanceof NumberNumberMetaMethod ||
-                    (method instanceof GeneratedMetaMethod && (name.equals("next") || name.equals("previous")))
-            ) {
+            if (metaMethod instanceof NumberNumberMetaMethod
+                    || (method instanceof GeneratedMetaMethod && (name.equals("next") || name.equals("previous")))) {
                 if (LOG_ENABLED) LOG.info("meta method is number method");
                 if (IndyMath.chooseMathMethod(this, metaMethod)) {
                     catchException = false;
@@ -633,6 +634,7 @@ public abstract class Selector {
             if (metaMethod instanceof CachedMethod) {
                 if (LOG_ENABLED) LOG.info("meta method is CachedMethod instance");
                 CachedMethod cm = (CachedMethod) metaMethod;
+                cm = (CachedMethod) VMPluginFactory.getPlugin().transformMetaMethod(getMetaClass(), cm, cm.getPT());
                 isVargs = cm.isVargsMethod();
                 try {
                     Method m = cm.getCachedMethod();

@@ -35,8 +35,6 @@ import java.security.PrivilegedAction;
 
 /**
  * Support for compilation related tasks.
- *
- * @author <a href="mailto:jason@planet57.com">Jason Dillon</a>
  */
 public abstract class CompileTaskSupport
     extends MatchingTask
@@ -139,12 +137,7 @@ public abstract class CompileTaskSupport
     protected GroovyClassLoader createClassLoader() {
         GroovyClassLoader gcl =
                 AccessController.doPrivileged(
-                        new PrivilegedAction<GroovyClassLoader>() {
-                            @Override
-                            public GroovyClassLoader run() {
-                                return new GroovyClassLoader(ClassLoader.getSystemClassLoader(), config);
-                            }
-                        });
+                        (PrivilegedAction<GroovyClassLoader>) () -> new GroovyClassLoader(ClassLoader.getSystemClassLoader(), config));
 
         Path path = getClasspath();
         if (path != null) {

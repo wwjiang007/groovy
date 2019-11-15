@@ -34,6 +34,7 @@ import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.macro.runtime.MacroContext;
 import org.codehaus.groovy.macro.runtime.MacroStub;
 import org.codehaus.groovy.runtime.InvokerHelper;
+import org.codehaus.groovy.transform.stc.AbstractExtensionMethodCache;
 import org.codehaus.groovy.transform.stc.ExtensionMethodNode;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport;
 
@@ -47,7 +48,6 @@ import java.util.List;
  * {@code MacroStub.INSTANCE.macroMethod(123)}
  * (where {@code myMacroMethod} returns constant expression {@code 123})
  *
- * @author Sergei Egorov <bsideup@gmail.com>
  * @since 2.5.0
  */
 class MacroCallTransformingVisitor extends ClassCodeVisitorSupport {
@@ -59,6 +59,7 @@ class MacroCallTransformingVisitor extends ClassCodeVisitorSupport {
     private static final PropertyExpression MACRO_STUB_INSTANCE = new PropertyExpression(new ClassExpression(MACRO_STUB_CLASS_NODE), "INSTANCE");
 
     private static final String MACRO_STUB_METHOD_NAME = "macroMethod";
+    private static final AbstractExtensionMethodCache MACRO_METHOD_CACHE = MacroMethodsCache.INSTANCE;
 
     private final SourceUnit sourceUnit;
     private final CompilationUnit unit;
@@ -115,7 +116,7 @@ class MacroCallTransformingVisitor extends ClassCodeVisitorSupport {
      * with @{@link org.codehaus.groovy.macro.runtime.Macro} annotation.
      */
     private List<MethodNode> findMacroMethods(String methodName, List<Expression> callArguments) {
-        List<MethodNode> methods = MacroMethodsCache.get(classLoader).get(methodName);
+        List<MethodNode> methods = MACRO_METHOD_CACHE.get(classLoader).get(methodName);
 
         if (methods == null) {
             // Not a macro call

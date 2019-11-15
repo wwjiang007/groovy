@@ -48,6 +48,7 @@ import java.util.Iterator;
 import java.util.LinkedHashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 
 /**
  * Class providing various type conversions, coercions and boxing/unboxing operations.
@@ -258,7 +259,7 @@ public class DefaultTypeTransformation {
                 // let's call the collections constructor
                 // passing in the list wrapper
                 try {
-                    answer = (Collection) type.newInstance();
+                    answer = (Collection) type.getDeclaredConstructor().newInstance();
                 } catch (Exception e) {
                     throw new GroovyCastException("Could not instantiate instance of: " + type.getName() + ". Reason: " + e);
                 }
@@ -585,8 +586,9 @@ public class DefaultTypeTransformation {
                 return ((GString) left).compareTo(right);
             }
             if (!equalityCheckOnly || left.getClass().isAssignableFrom(right.getClass())
-                    || (right.getClass() != Object.class && right.getClass().isAssignableFrom(left.getClass())) //GROOVY-4046
-                    ) {
+                    || (right.getClass() != Object.class && right.getClass().isAssignableFrom(left.getClass()) //GROOVY-4046
+                    || right instanceof Comparable) // GROOVY-7954
+            ) {
                 Comparable comparable = (Comparable) left;
                 // GROOVY-7876: when comparing for equality we try to only call compareTo when an assignable
                 // relationship holds but with a container/holder class and because of erasure, we might still end
@@ -642,11 +644,10 @@ public class DefaultTypeTransformation {
         if (left instanceof Map.Entry && right instanceof Map.Entry) {
             Object k1 = ((Map.Entry) left).getKey();
             Object k2 = ((Map.Entry) right).getKey();
-            if (k1 == k2 || (k1 != null && k1.equals(k2))) {
+            if (Objects.equals(k1, k2)) {
                 Object v1 = ((Map.Entry) left).getValue();
                 Object v2 = ((Map.Entry) right).getValue();
-                if (v1 == v2 || (v1 != null && DefaultTypeTransformation.compareEqual(v1, v2)))
-                    return true;
+                return v1 == v2 || (v1 != null && DefaultTypeTransformation.compareEqual(v1, v2));
             }
             return false;
         }

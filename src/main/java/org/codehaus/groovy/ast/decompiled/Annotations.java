@@ -33,9 +33,8 @@ import java.lang.reflect.Array;
 import java.util.List;
 import java.util.Map;
 
-/**
- * @author Peter Gromov
- */
+import static org.codehaus.groovy.ast.tools.GeneralUtils.nullX;
+
 class Annotations {
     static AnnotationNode createAnnotationNode(AnnotationStub annotation, AsmReferenceResolver resolver) {
         ClassNode classNode = resolver.resolveClassNullable(Type.getType(annotation.className).getClassName());
@@ -73,7 +72,7 @@ class Annotations {
 
         if (value instanceof AnnotationStub) {
             AnnotationNode annotationNode = createAnnotationNode((AnnotationStub) value, resolver);
-            return annotationNode != null ? new AnnotationConstantExpression(annotationNode) : ConstantExpression.NULL;
+            return annotationNode != null ? new AnnotationConstantExpression(annotationNode) : nullX();
         }
 
         if (value != null && value.getClass().isArray()) {

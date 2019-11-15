@@ -18,10 +18,13 @@
  */
 package org.codehaus.groovy.vmplugin;
 
+import groovy.lang.MetaClass;
+import groovy.lang.MetaMethod;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.CompileUnit;
 
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Method;
 
 /**
@@ -60,4 +63,54 @@ public interface VMPlugin {
      */
     int getVersion();
 
+    /**
+     * Check whether invoking {@link AccessibleObject#setAccessible(boolean)} on the accessible object will be completed successfully
+     *
+     * @param accessibleObject the accessible object to check
+     * @param callerClass the callerClass to invoke {@code setAccessible}
+     * @return the check result
+     */
+    boolean checkCanSetAccessible(AccessibleObject accessibleObject, Class<?> callerClass);
+
+    /**
+     * check whether the member can be accessed or not
+     * @param callerClass callerClass the callerClass to invoke {@code setAccessible}
+     * @param declaringClass the type of member owner
+     * @param memberModifiers modifiers of member
+     * @param allowIllegalAccess whether to allow illegal access
+     * @return the result of checking
+     */
+    boolean checkAccessible(Class<?> callerClass, Class<?> declaringClass, int memberModifiers, boolean allowIllegalAccess);
+
+    /**
+     * Set the {@code accessible} flag for this reflected object to {@code true}
+     * if possible.
+     *
+     * @param ao the accessible object
+     * @return {@code true} if the {@code accessible} flag is set to {@code true};
+     *         {@code false} if access cannot be enabled.
+     * @throws SecurityException if the request is denied by the security manager
+     */
+    boolean trySetAccessible(AccessibleObject ao);
+
+    /**
+     * transform meta method
+     *
+     * @param metaClass meta class
+     * @param metaMethod the original meta method
+     * @param params parameter types
+     * @param caller caller class, whose method sets accessible for methods
+     * @return the transformed meta method
+     */
+    MetaMethod transformMetaMethod(MetaClass metaClass, MetaMethod metaMethod, Class<?>[] params, Class<?> caller);
+
+    /**
+     * transform meta method.
+     *
+     * @param metaClass meta class
+     * @param metaMethod the original meta method
+     * @param params parameter types
+     * @return the transformed meta method
+     */
+    MetaMethod transformMetaMethod(MetaClass metaClass, MetaMethod metaMethod, Class<?>[] params);
 }

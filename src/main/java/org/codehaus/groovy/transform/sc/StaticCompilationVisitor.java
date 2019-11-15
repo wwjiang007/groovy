@@ -98,8 +98,6 @@ import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
  *
  * Static compilation relies on static type checking, which explains why this visitor extends the type checker
  * visitor.
- *
- * @author Cedric Champeau
  */
 public class StaticCompilationVisitor extends StaticTypeCheckingVisitor {
     private static final ClassNode TYPECHECKED_CLASSNODE = ClassHelper.make(TypeChecked.class);
@@ -451,7 +449,6 @@ public class StaticCompilationVisitor extends StaticTypeCheckingVisitor {
                 componentType = inferLoopElementType(collectionType);
             }
             forLoop.getVariable().setType(componentType);
-            forLoop.getVariable().setOriginType(componentType);
         }
     }
 

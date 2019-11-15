@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.CompilationUnit.PrimaryClassNodeOperation
 import org.codehaus.groovy.classgen.GeneratorContext
@@ -31,8 +32,6 @@ import org.codehaus.groovy.ast.ClassNode
  *
  * This test checks that closure inner classes are direct child of their enclosing class,
  * instead of being child of the outermost class.
- *
- * @author Guillaume Laforge
  */
 class ClosureAndInnerClassNodeStructureTest extends GroovyTestCase {
 

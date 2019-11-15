@@ -24,21 +24,19 @@ import org.codehaus.groovy.ast.stmt.Statement;
 import org.objectweb.asm.Opcodes;
 
 import java.util.List;
+import java.util.Optional;
 
 /**
- * Represents a method declaration
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- * @author Hamlet D'Arcy
+ * Represents a method declaration.
  */
 public class MethodNode extends AnnotatedNode implements Opcodes {
-    public static final String SCRIPT_BODY_METHOD_KEY = "org.codehaus.groovy.ast.MethodNode.isScriptBody";
+
     private final String name;
     private int modifiers;
     private boolean syntheticPublic;
     private ClassNode returnType;
     private Parameter[] parameters;
-    private boolean hasDefaultValue = false;
+    private boolean hasDefaultValue;
     private Statement code;
     private boolean dynamicReturnType;
     private VariableScope variableScope;
@@ -46,21 +44,17 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
     private final boolean staticConstructor;
 
     // type spec for generics
-    private GenericsType[] genericsTypes = null;
-    private boolean hasDefault;
+    private GenericsType[] genericsTypes;
 
     // cached data
-    String typeDescriptor;
+    private String typeDescriptor;
 
     public MethodNode(String name, int modifiers, ClassNode returnType, Parameter[] parameters, ClassNode[] exceptions, Statement code) {
         this.name = name;
         this.modifiers = modifiers;
         this.code = code;
         setReturnType(returnType);
-        VariableScope scope = new VariableScope();
-        setVariableScope(scope);
         setParameters(parameters);
-        this.hasDefault = false;
         this.exceptions = exceptions;
         this.staticConstructor = (name != null && name.equals("<clinit>"));
     }
@@ -69,8 +63,6 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
      * The type descriptor for a method node is a string containing the name of the method, its return type,
      * and its parameter types in a canonical form. For simplicity, we use the format of a Java declaration
      * without parameter names or generics.
-     *
-     * @return the type descriptor
      */
     public String getTypeDescriptor() {
         if (typeDescriptor == null) {
@@ -81,10 +73,6 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
 
     private void invalidateCachedData() {
         typeDescriptor = null;
-    }
-
-    public boolean isVoidMethod() {
-        return returnType == ClassHelper.VOID_TYPE;
     }
 
     public Statement getCode() {
@@ -115,6 +103,7 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
     public void setParameters(Parameter[] parameters) {
         invalidateCachedData();
         VariableScope scope = new VariableScope();
+        this.hasDefaultValue = false;
         this.parameters = parameters;
         if (parameters != null && parameters.length > 0) {
             for (Parameter para : parameters) {
@@ -128,8 +117,29 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
         setVariableScope(scope);
     }
 
+    /**
+     * @return {@code true} if any parameter has a default value
+     */
+    public boolean hasDefaultValue() {
+        return hasDefaultValue;
+    }
+
     public ClassNode getReturnType() {
         return returnType;
+    }
+
+    public void setReturnType(ClassNode returnType) {
+        invalidateCachedData();
+        this.dynamicReturnType |= ClassHelper.DYNAMIC_TYPE == returnType;
+        this.returnType = returnType != null ? returnType : ClassHelper.OBJECT_TYPE;
+    }
+
+    public boolean isDynamicReturnType() {
+        return dynamicReturnType;
+    }
+
+    public boolean isVoidMethod() {
+        return ClassHelper.VOID_TYPE.equals(getReturnType());
     }
 
     public VariableScope getVariableScope() {
@@ -141,12 +151,17 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
         variableScope.setInStaticContext(isStatic());
     }
 
-    public boolean isDynamicReturnType() {
-        return dynamicReturnType;
-    }
-
     public boolean isAbstract() {
         return (modifiers & ACC_ABSTRACT) != 0;
+    }
+
+    public boolean isDefault() {
+        return (modifiers & (ACC_ABSTRACT | ACC_PUBLIC | ACC_STATIC)) == ACC_PUBLIC &&
+            Optional.ofNullable(getDeclaringClass()).filter(ClassNode::isInterface).isPresent();
+    }
+
+    public boolean isFinal() {
+        return (modifiers & ACC_FINAL) != 0;
     }
 
     public boolean isStatic() {
@@ -161,46 +176,12 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
         return (modifiers & ACC_PRIVATE) != 0;
     }
 
-    public boolean isFinal() {
-        return (modifiers & ACC_FINAL) != 0;
-    }
-
     public boolean isProtected() {
         return (modifiers & ACC_PROTECTED) != 0;
     }
 
     public boolean isPackageScope() {
-        return !(this.isPrivate() || this.isProtected() || this.isPublic());
-    }
-
-    public boolean hasDefaultValue() {
-        return this.hasDefaultValue;
-    }
-
-    /**
-     * @return true if this method is the run method from a script
-     */
-    public boolean isScriptBody() {
-        return getNodeMetaData(SCRIPT_BODY_METHOD_KEY) != null;
-    }
-
-    /**
-     * Set the metadata flag for this method to indicate that it is a script body implementation.
-     * @see ModuleNode createStatementsClass().
-     */
-    public void setIsScriptBody() {
-        setNodeMetaData(SCRIPT_BODY_METHOD_KEY, true);
-    }
-
-    public String toString() {
-        return "MethodNode@" + hashCode() + "[" + getDeclaringClass().getName() + "#" + getTypeDescriptor() + "]";
-    }
-
-    public void setReturnType(ClassNode returnType) {
-        invalidateCachedData();
-        dynamicReturnType |= ClassHelper.DYNAMIC_TYPE == returnType;
-        this.returnType = returnType;
-        if (returnType == null) this.returnType = ClassHelper.OBJECT_TYPE;
+        return (modifiers & (ACC_PUBLIC | ACC_PRIVATE | ACC_PROTECTED)) == 0;
     }
 
     public ClassNode[] getExceptions() {
@@ -230,12 +211,35 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
         this.genericsTypes = genericsTypes;
     }
 
-    public void setAnnotationDefault(boolean b) {
-        this.hasDefault = b;
+    /**
+     * @return {@code true} if annotation method has a default value
+     */
+    public boolean hasAnnotationDefault() {
+        return Boolean.TRUE.equals(getNodeMetaData("org.codehaus.groovy.ast.MethodNode.hasDefaultValue"));
     }
 
-    public boolean hasAnnotationDefault() {
-        return hasDefault;
+    public void setAnnotationDefault(boolean hasDefaultValue) {
+        if (hasDefaultValue) {
+            putNodeMetaData("org.codehaus.groovy.ast.MethodNode.hasDefaultValue", Boolean.TRUE);
+        } else {
+            removeNodeMetaData("org.codehaus.groovy.ast.MethodNode.hasDefaultValue");
+        }
+    }
+
+    /**
+     * @return {@code true} if this method is the run method from a script
+     */
+    public boolean isScriptBody() {
+        return Boolean.TRUE.equals(getNodeMetaData("org.codehaus.groovy.ast.MethodNode.isScriptBody"));
+    }
+
+    /**
+     * Sets the flag for this method to indicate it is a script body implementation.
+     *
+     * @see ModuleNode#createStatementsClass()
+     */
+    public void setIsScriptBody() {
+        setNodeMetaData("org.codehaus.groovy.ast.MethodNode.isScriptBody", Boolean.TRUE);
     }
 
     public boolean isStaticConstructor() {
@@ -249,7 +253,7 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
      * Groovy's "public methods by default" rule. This property is
      * typically only of interest to AST transform writers.
      *
-     * @return true if this class is public but had no explicit public modifier
+     * @return {@code true} if this class is public but had no explicit public modifier
      */
     public boolean isSyntheticPublic() {
         return syntheticPublic;
@@ -261,15 +265,20 @@ public class MethodNode extends AnnotatedNode implements Opcodes {
 
     /**
      * Provides a nicely formatted string of the method definition. For simplicity, generic types on some of the elements
-     * are not displayed. 
-     * @return
-     *      string form of node with some generic elements suppressed
+     * are not displayed.
+     *
+     * @return string form of node with some generic elements suppressed
      */
     @Override
     public String getText() {
         String retType = AstToTextHelper.getClassText(returnType);
         String exceptionTypes = AstToTextHelper.getThrowsClauseText(exceptions);
-        String parms = AstToTextHelper.getParametersText(parameters);
-        return AstToTextHelper.getModifiersText(modifiers) + " " + retType + " " + name + "(" + parms + ") " + exceptionTypes + " { ... }";
+        String params = AstToTextHelper.getParametersText(parameters);
+        return AstToTextHelper.getModifiersText(modifiers) + " " + retType + " " + name + "(" + params + ") " + exceptionTypes + " { ... }";
+    }
+
+    @Override
+    public String toString() {
+        return super.toString() + "[" + getDeclaringClass().getName() + "#" + getTypeDescriptor() + "]";
     }
 }

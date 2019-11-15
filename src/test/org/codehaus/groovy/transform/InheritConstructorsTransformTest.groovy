@@ -18,9 +18,8 @@
  */
 package org.codehaus.groovy.transform
 
-/**
- * @author Paul King
- */
+import groovy.test.GroovyShellTestCase
+
 class InheritConstructorsTransformTest extends GroovyShellTestCase {
 
     void testStandardCase() {

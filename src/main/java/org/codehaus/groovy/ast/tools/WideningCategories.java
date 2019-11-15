@@ -67,9 +67,6 @@ import static org.codehaus.groovy.ast.GenericsType.GenericsTypeName;
  * the number 1 being int, since the 1 is an int. The 2l is a long, therefore the
  * int category will not apply and the result type can't be int. The next category
  * in the list is long, and since both apply to long, the result type is a long.
- *
- * @author <a href="mailto:blackdrag@gmx.org">Jochen "blackdrag" Theodorou</a>
- * @author Cedric Champeau
  */
 public class WideningCategories {
 
@@ -92,18 +89,16 @@ public class WideningCategories {
      * since a concrete implementation should be used at compile time, we must ensure that interfaces are
      * always sorted. It is not important what sort is used, as long as the result is constant.
      */
-    private static final Comparator<ClassNode> INTERFACE_CLASSNODE_COMPARATOR = new Comparator<ClassNode>() {
-        public int compare(final ClassNode o1, final ClassNode o2) {
-            int interfaceCountForO1 = o1.getInterfaces().length;
-            int interfaceCountForO2 = o2.getInterfaces().length;
-            if (interfaceCountForO1 > interfaceCountForO2) return -1;
-            if (interfaceCountForO1 < interfaceCountForO2) return 1;
-            int methodCountForO1 = o1.getMethods().size();
-            int methodCountForO2 = o2.getMethods().size();
-            if (methodCountForO1 > methodCountForO2) return -1;
-            if (methodCountForO1 < methodCountForO2) return 1;
-            return o1.getName().compareTo(o2.getName());
-        }
+    private static final Comparator<ClassNode> INTERFACE_CLASSNODE_COMPARATOR = (o1, o2) -> {
+        int interfaceCountForO1 = o1.getInterfaces().length;
+        int interfaceCountForO2 = o2.getInterfaces().length;
+        if (interfaceCountForO1 > interfaceCountForO2) return -1;
+        if (interfaceCountForO1 < interfaceCountForO2) return 1;
+        int methodCountForO1 = o1.getMethods().size();
+        int methodCountForO2 = o2.getMethods().size();
+        if (methodCountForO1 > methodCountForO2) return -1;
+        if (methodCountForO1 < methodCountForO2) return 1;
+        return o1.getName().compareTo(o2.getName());
     };
 
     /**
@@ -504,7 +499,7 @@ public class WideningCategories {
                 return;
             }
             if (interfaceNode.implementsInterface(node)) {
-                // the interface beeing added is more specific than the one in the list, replace it
+                // the interface being added is more specific than the one in the list, replace it
                 nodes.set(i, interfaceNode);
                 return;
             }
@@ -586,7 +581,7 @@ public class WideningCategories {
     /**
      * This {@link ClassNode} specialization is used when the lowest upper bound of two types
      * cannot be represented by an existing type. For example, if B extends A,  C extends A
-     * and both C & B implement a common interface not implemented by A, then we use this class
+     * and both C and B implement a common interface not implemented by A, then we use this class
      * to represent the bound.
      *
      * At compile time, some classes like {@link org.codehaus.groovy.classgen.AsmClassGenerator} need
@@ -595,12 +590,10 @@ public class WideningCategories {
      *
      */
     public static class LowestUpperBoundClassNode extends ClassNode {
-        private static final Comparator<ClassNode> CLASS_NODE_COMPARATOR = new Comparator<ClassNode>() {
-            public int compare(final ClassNode o1, final ClassNode o2) {
-                String n1 = o1 instanceof LowestUpperBoundClassNode?((LowestUpperBoundClassNode)o1).name:o1.getName();
-                String n2 = o2 instanceof LowestUpperBoundClassNode?((LowestUpperBoundClassNode)o2).name:o2.getName();
-                return n1.compareTo(n2);
-            }
+        private static final Comparator<ClassNode> CLASS_NODE_COMPARATOR = (o1, o2) -> {
+            String n1 = o1 instanceof LowestUpperBoundClassNode?((LowestUpperBoundClassNode)o1).name:o1.getName();
+            String n2 = o2 instanceof LowestUpperBoundClassNode?((LowestUpperBoundClassNode)o2).name:o2.getName();
+            return n1.compareTo(n2);
         };
         private final ClassNode compileTimeClassNode;
         private final String name;

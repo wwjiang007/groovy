@@ -28,6 +28,7 @@ import java.util.AbstractMap;
 import java.util.AbstractQueue;
 import java.util.AbstractSet;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedHashMap;
@@ -44,7 +45,6 @@ import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 import java.util.function.Function;
 
-import static java.util.Collections.emptyList;
 import static java.util.Collections.unmodifiableMap;
 import static java.util.Collections.unmodifiableSet;
 import static org.apache.groovy.util.concurrentlinkedhashmap.ConcurrentLinkedHashMap.DrainStatus.IDLE;
@@ -96,7 +96,6 @@ import static org.apache.groovy.util.concurrentlinkedhashmap.ConcurrentLinkedHas
  * predictable iteration order. A snapshot of the keys and entries may be
  * obtained in ascending and descending order of retention.
  *
- * @author ben.manes@gmail.com (Ben Manes)
  * @param <K> the type of keys maintained by this map
  * @param <V> the type of mapped values
  * @see <a href="http://code.google.com/p/concurrentlinkedhashmap/">
@@ -1507,7 +1506,7 @@ public final class ConcurrentLinkedHashMap<K, V> extends AbstractMap<K, V>
     @Override public Object poll() { return null; }
     @Override public Object peek() { return null; }
     @Override public int size() { return 0; }
-    @Override public Iterator<Object> iterator() { return emptyList().iterator(); }
+    @Override public Iterator<Object> iterator() { return Collections.emptyIterator(); }
   }
 
   /** A listener that ignores all notifications. */

@@ -18,13 +18,12 @@
  */
 package groovy.lang
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.control.CompilationUnit
 import org.codehaus.groovy.control.Phases
 
 /**
  * Check that scripts have proper source position in the AST
- *
- * @author Guillaume Laforge
  */
 class ScriptSourcePositionInAstTest extends GroovyTestCase {
 
@@ -32,7 +31,7 @@ class ScriptSourcePositionInAstTest extends GroovyTestCase {
         CompilationUnit cu = new CompilationUnit()
         cu.addSource("scriptSourcePosition.groovy", text)
         cu.compile(Phases.SEMANTIC_ANALYSIS)
-        
+
         def node = cu.getAST().getClass("scriptSourcePosition")
 
         [[node.getLineNumber(), node.getColumnNumber()], [node.getLastLineNumber(), node.getLastColumnNumber()]]

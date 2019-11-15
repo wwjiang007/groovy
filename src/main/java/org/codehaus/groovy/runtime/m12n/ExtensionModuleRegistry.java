@@ -29,7 +29,6 @@ import java.util.List;
  * In previous Groovy versions, such methods could only be defined in a single class called {@link org.codehaus.groovy.runtime.DefaultGroovyMethods}
  * for instance methods, and {@link org.codehaus.groovy.runtime.DefaultGroovyStaticMethods} for static methods.
  *
- * @author Cedric Champeau
  * @since 2.0.0
  */
 public class ExtensionModuleRegistry {
@@ -51,11 +50,7 @@ public class ExtensionModuleRegistry {
     }
 
     public boolean hasModule(final String moduleName) {
-        if (null == getModule(moduleName)) {
-            return false;
-        }
-
-        return true;
+        return null != getModule(moduleName);
     }
 
     public ExtensionModule getModule(final String moduleName) {

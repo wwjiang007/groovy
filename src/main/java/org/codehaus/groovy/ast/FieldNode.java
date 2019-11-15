@@ -25,8 +25,6 @@ import java.lang.reflect.Field;
 
 /**
  * Represents a field (member variable)
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
 
@@ -37,7 +35,7 @@ public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
     private Expression initialValueExpression;
     private boolean dynamicTyped;
     private boolean holder;
-    private ClassNode originType = ClassHelper.DYNAMIC_TYPE;
+    private ClassNode originType;
 
     public static FieldNode newStatic(Class theClass, String name) throws SecurityException, NoSuchFieldException {
         Field field = theClass.getField(name);
@@ -48,27 +46,27 @@ public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
     public FieldNode(String name, int modifiers, ClassNode type, ClassNode owner, Expression initialValueExpression) {
         this.name = name;
         this.modifiers = modifiers;
-        this.type = type;
-        if (this.type == ClassHelper.DYNAMIC_TYPE && initialValueExpression != null)
-            this.setType(initialValueExpression.getType());
         this.setType(type);
-        this.originType = type;
         this.owner = owner;
         this.initialValueExpression = initialValueExpression;
     }
 
+    @Override
     public Expression getInitialExpression() {
         return initialValueExpression;
     }
 
+    @Override
     public int getModifiers() {
         return modifiers;
     }
 
+    @Override
     public String getName() {
         return name;
     }
 
+    @Override
     public ClassNode getType() {
         return type;
     }
@@ -91,6 +89,7 @@ public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
         this.holder = holder;
     }
 
+    @Override
     public boolean isDynamicTyped() {
         return dynamicTyped;
     }
@@ -156,10 +155,12 @@ public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
         this.owner = owner;
     }
 
+    @Override
     public boolean hasInitialExpression() {
         return initialValueExpression != null;
     }
 
+    @Override
     public boolean isInStaticContext() {
         return isStatic();
     }
@@ -175,27 +176,29 @@ public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
     /**
      * @deprecated
      */
-    @Deprecated
+    @Deprecated @Override
     public boolean isClosureSharedVariable() {
         return false;
     }
+
     /**
      * @deprecated
      */
-    @Deprecated
+    @Deprecated @Override
     public void setClosureSharedVariable(boolean inClosure) {
     }
 
+    @Override
     public ClassNode getOriginType() {
         return originType;
     }
-    
+
     public void setOriginType(ClassNode cn) {
         originType = cn;
     }
 
     public void rename(String name) {
-        declaringClass.renameField(this.name, name);
+        getDeclaringClass().renameField(this.name, name);
         this.name = name;
     }
 }

@@ -42,10 +42,8 @@ import org.codehaus.groovy.classgen.asm.WriterControllerFactory;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.sc.StaticCompilationMetadataKeys;
 import org.codehaus.groovy.transform.stc.StaticTypesMarker;
-import org.objectweb.asm.Handle;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
-import org.objectweb.asm.Type;
 
 import java.util.Arrays;
 import java.util.HashMap;
@@ -54,8 +52,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.stream.Collectors;
 
-import static org.codehaus.groovy.transform.stc.StaticTypesMarker.INFERRED_LAMBDA_TYPE;
-import static org.codehaus.groovy.transform.stc.StaticTypesMarker.PARAMETER_TYPE;
 import static org.objectweb.asm.Opcodes.ACC_FINAL;
 import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 import static org.objectweb.asm.Opcodes.ACC_STATIC;
@@ -68,9 +64,8 @@ import static org.objectweb.asm.Opcodes.NEW;
 /**
  * Writer responsible for generating lambda classes in statically compiled mode.
  */
-public class StaticTypesLambdaWriter extends LambdaWriter {
+public class StaticTypesLambdaWriter extends LambdaWriter implements AbstractFunctionalInterfaceWriter {
     private static final String DO_CALL = "doCall";
-    private static final String ORIGINAL_PARAMETERS_WITH_EXACT_TYPE = "__ORIGINAL_PARAMETERS_WITH_EXACT_TYPE";
     private static final String LAMBDA_SHARED_VARIABLES = "__LAMBDA_SHARED_VARIABLES";
     private static final String ENCLOSING_THIS = "__enclosing_this";
     private static final String LAMBDA_THIS = "__lambda_this";
@@ -90,11 +85,16 @@ public class StaticTypesLambdaWriter extends LambdaWriter {
 
     @Override
     public void writeLambda(LambdaExpression expression) {
-        ClassNode lambdaType = getLambdaType(expression);
-        ClassNode redirect = lambdaType.redirect();
+        ClassNode functionalInterfaceType = getFunctionalInterfaceType(expression);
+        if (null == functionalInterfaceType) {
+            // if the parameter type failed to be inferred, generate the default bytecode, which is actually a closure
+            super.writeLambda(expression);
+            return;
+        }
 
-        if (null == lambdaType || !ClassHelper.isFunctionalInterface(redirect)) {
-            // if the parameter type is not real FunctionInterface or failed to be inferred, generate the default bytecode, which is actually a closure
+        ClassNode redirect = functionalInterfaceType.redirect();
+        if (!ClassHelper.isFunctionalInterface(redirect)) {
+            // if the parameter type is not real FunctionalInterface, generate the default bytecode, which is actually a closure
             super.writeLambda(expression);
             return;
         }
@@ -117,20 +117,11 @@ public class StaticTypesLambdaWriter extends LambdaWriter {
 
         mv.visitInvokeDynamicInsn(
                 abstractMethodNode.getName(),
-                createAbstractMethodDesc(lambdaType, lambdaWrapperClassNode),
+                createAbstractMethodDesc(functionalInterfaceType, lambdaWrapperClassNode),
                 createBootstrapMethod(isInterface),
-                createBootstrapMethodArguments(abstractMethodDesc, lambdaWrapperClassNode, syntheticLambdaMethodNode)
+                createBootstrapMethodArguments(abstractMethodDesc, Opcodes.H_INVOKEVIRTUAL, lambdaWrapperClassNode, syntheticLambdaMethodNode)
         );
         operandStack.replace(redirect, 2);
-    }
-
-    private ClassNode getLambdaType(LambdaExpression expression) {
-        ClassNode type = expression.getNodeMetaData(PARAMETER_TYPE);
-
-        if (null == type) {
-            type = expression.getNodeMetaData(INFERRED_LAMBDA_TYPE);
-        }
-        return type;
     }
 
     private void loadEnclosingClassInstance() {
@@ -153,7 +144,7 @@ public class StaticTypesLambdaWriter extends LambdaWriter {
         mv.visitInsn(DUP);
 
         loadEnclosingClassInstance();
-        loadEnclosingClassInstance();
+        controller.getOperandStack().dup();
 
         loadSharedVariables(syntheticLambdaMethodNode);
 
@@ -186,46 +177,13 @@ public class StaticTypesLambdaWriter extends LambdaWriter {
         return lambdaSharedVariableParameters;
     }
 
-    private String createAbstractMethodDesc(ClassNode parameterType, ClassNode lambdaClassNode) {
+    private String createAbstractMethodDesc(ClassNode functionalInterfaceType, ClassNode lambdaClassNode) {
         List<Parameter> lambdaSharedVariableList = new LinkedList<>();
 
         prependEnclosingThis(lambdaSharedVariableList);
         prependParameter(lambdaSharedVariableList, LAMBDA_THIS, lambdaClassNode);
 
-        return BytecodeHelper.getMethodDescriptor(parameterType.redirect(), lambdaSharedVariableList.toArray(Parameter.EMPTY_ARRAY));
-    }
-
-    private Handle createBootstrapMethod(boolean isInterface) {
-        return new Handle(
-                Opcodes.H_INVOKESTATIC,
-                "java/lang/invoke/LambdaMetafactory",
-                "metafactory",
-                "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodType;Ljava/lang/invoke/MethodHandle;Ljava/lang/invoke/MethodType;)Ljava/lang/invoke/CallSite;",
-                isInterface
-        );
-    }
-
-    private Object[] createBootstrapMethodArguments(String abstractMethodDesc, ClassNode lambdaClassNode, MethodNode syntheticLambdaMethodNode) {
-        return new Object[]{
-                Type.getType(abstractMethodDesc),
-                new Handle(
-                        Opcodes.H_INVOKEVIRTUAL,
-                        lambdaClassNode.getName(),
-                        syntheticLambdaMethodNode.getName(),
-                        BytecodeHelper.getMethodDescriptor(syntheticLambdaMethodNode),
-                        lambdaClassNode.isInterface()
-                ),
-                Type.getType(BytecodeHelper.getMethodDescriptor(syntheticLambdaMethodNode.getReturnType(), syntheticLambdaMethodNode.getNodeMetaData(ORIGINAL_PARAMETERS_WITH_EXACT_TYPE)))
-        };
-    }
-
-    private String createMethodDescriptor(MethodNode abstractMethodNode) {
-        return BytecodeHelper.getMethodDescriptor(
-                abstractMethodNode.getReturnType().getTypeClass(),
-                Arrays.stream(abstractMethodNode.getParameters())
-                        .map(e -> e.getType().getTypeClass())
-                        .toArray(Class[]::new)
-        );
+        return BytecodeHelper.getMethodDescriptor(functionalInterfaceType.redirect(), lambdaSharedVariableList.toArray(Parameter.EMPTY_ARRAY));
     }
 
     public ClassNode getOrAddLambdaClass(LambdaExpression expression, int mods, MethodNode abstractMethodNode) {
@@ -311,17 +269,6 @@ public class StaticTypesLambdaWriter extends LambdaWriter {
         return prependParameter(methodParameterList, ENCLOSING_THIS, controller.getClassNode().getPlainNodeReference());
     }
 
-    private Parameter prependParameter(List<Parameter> methodParameterList, String parameterName, ClassNode parameterType) {
-        Parameter parameter = new Parameter(parameterType, parameterName);
-
-        parameter.setOriginType(parameterType);
-        parameter.setClosureSharedVariable(false);
-
-        methodParameterList.add(0, parameter);
-
-        return parameter;
-    }
-
     private Parameter[] createParametersWithExactType(LambdaExpression expression) {
         Parameter[] parameters = expression.getParameters();
         if (parameters == null) {
@@ -329,14 +276,17 @@ public class StaticTypesLambdaWriter extends LambdaWriter {
         }
 
         for (Parameter parameter : parameters) {
+            ClassNode parameterType = parameter.getType();
             ClassNode inferredType = parameter.getNodeMetaData(StaticTypesMarker.INFERRED_TYPE);
 
             if (null == inferredType) {
                 continue;
             }
 
-            parameter.setType(inferredType);
-            parameter.setOriginType(inferredType);
+            ClassNode type = convertParameterType(parameterType, inferredType);
+
+            parameter.setType(type);
+            parameter.setOriginType(type);
         }
 
         return parameters;

@@ -20,8 +20,9 @@ package org.codehaus.groovy.ast.stmt;
 
 import org.codehaus.groovy.ast.GroovyCodeVisitor;
 import org.codehaus.groovy.ast.expr.BooleanExpression;
-import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
+
+import static org.codehaus.groovy.ast.tools.GeneralUtils.nullX;
 
 /**
  * Represents an assert statement.
@@ -29,23 +30,21 @@ import org.codehaus.groovy.ast.expr.Expression;
  * <code>
  * assert i != 0 : "should never be zero";
  * </code>
- * 
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class AssertStatement extends Statement {
 
     private BooleanExpression booleanExpression;
     private Expression messageExpression;
-    
+
     public AssertStatement(BooleanExpression booleanExpression) {
-        this(booleanExpression, ConstantExpression.NULL);
+        this(booleanExpression, nullX());
     }
-    
+
     public AssertStatement(BooleanExpression booleanExpression, Expression messageExpression) {
         this.booleanExpression = booleanExpression;
         this.messageExpression = messageExpression;
     }
-    
+
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitAssertStatement(this);
     }
@@ -57,9 +56,11 @@ public class AssertStatement extends Statement {
     public BooleanExpression getBooleanExpression() {
         return booleanExpression;
     }
+
     public void setBooleanExpression(BooleanExpression booleanExpression) {
         this.booleanExpression = booleanExpression;
     }
+
     public void setMessageExpression(Expression messageExpression) {
         this.messageExpression = messageExpression;
     }

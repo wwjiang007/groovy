@@ -18,6 +18,8 @@
  */
 package groovy.util
 
+import groovy.test.GroovyTestCase
+
 import static GroovyCollections.min
 import static GroovyCollections.max
 import static GroovyCollections.combinations
@@ -26,10 +28,8 @@ import static GroovyCollections.sum
 
 /**
 * Tests GroovyCollections
-*
-* @author Paul King
 */
-public class GroovyCollectionsTest extends GroovyTestCase {
+class GroovyCollectionsTest extends GroovyTestCase {
 
     void testCombinations() {
         // use Sets because we don't care about order

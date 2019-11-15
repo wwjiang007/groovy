@@ -24,14 +24,15 @@ dependencies {
         provided dep
         exclude(group: 'javax.servlet', module: 'servlet-api')
     }
-    compile rootProject
-    testCompile "jmock:jmock:$jmockVersion"
+    testImplementation "jmock:jmock:$jmockVersion"
+
+    implementation rootProject
     // needed for MarkupBuilder
-    compile project(':groovy-xml')
+    implementation project(':groovy-xml')
     // needed by TemplateServlet
-    compile project(':groovy-templates')
-    testCompile rootProject.sourceSets.test.runtimeClasspath
-    testCompile project(':groovy-test')
-    // for compilation, dependency is not necessary because the classes are loaded using Class.forName
-    testCompile project(':groovy-json')
+    implementation project(':groovy-templates')
+
+    testImplementation rootProject.sourceSets.test.runtimeClasspath
+    testImplementation project(':groovy-json')
+    testImplementation project(':groovy-test')
 }

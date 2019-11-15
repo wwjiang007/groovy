@@ -22,7 +22,7 @@ import groovy.lang.Binding;
 import groovy.lang.GroovyClassLoader;
 import groovy.lang.GroovyCodeSource;
 import groovy.lang.Script;
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import junit.framework.TestCase;
 import junit.framework.TestFailure;
 import junit.framework.TestResult;
@@ -40,9 +40,6 @@ import java.security.Policy;
 import java.security.PrivilegedAction;
 import java.util.Enumeration;
 
-/**
- * @author Steve Goetze
- */
 public abstract class SecurityTestSupport extends GroovyTestCase {
     private static final String POLICY_FILE = "security/groovy.policy";
     private static int counter = 0;
@@ -94,12 +91,7 @@ public abstract class SecurityTestSupport extends GroovyTestCase {
 
     protected GroovyClassLoader loader =
             AccessController.doPrivileged(
-                    new PrivilegedAction<GroovyClassLoader>() {
-                        @Override
-                        public GroovyClassLoader run() {
-                            return new GroovyClassLoader(SecurityTestSupport.class.getClassLoader());
-                        }
-                    }
+                    (PrivilegedAction<GroovyClassLoader>) () -> new GroovyClassLoader(SecurityTestSupport.class.getClassLoader())
             );
 
     private SecurityManager securityManager;
@@ -138,23 +130,17 @@ public abstract class SecurityTestSupport extends GroovyTestCase {
             }
         }
         currentClassLoader = Thread.currentThread().getContextClassLoader();
-        AccessController.doPrivileged(new PrivilegedAction() {
-            @Override
-            public Object run() {
-                Thread.currentThread().setContextClassLoader(loader);
-                return null;
-            }
+        AccessController.doPrivileged((PrivilegedAction) () -> {
+            Thread.currentThread().setContextClassLoader(loader);
+            return null;
         });
     }
 
     protected void tearDown() {
-        AccessController.doPrivileged(new PrivilegedAction() {
-            @Override
-            public Object run() {
-                System.setSecurityManager(securityManager);
-                Thread.currentThread().setContextClassLoader(currentClassLoader);
-                return null;
-            }
+        AccessController.doPrivileged((PrivilegedAction) () -> {
+            System.setSecurityManager(securityManager);
+            Thread.currentThread().setContextClassLoader(currentClassLoader);
+            return null;
         });
     }
 
@@ -277,18 +263,15 @@ public abstract class SecurityTestSupport extends GroovyTestCase {
         // Use our privileged access in order to prevent checks lower in the call stack.  Otherwise we would have
         // to grant access to IDE unit test runners and unit test libs.  We only care about testing the call stack
         // higher upstream from this point of execution.
-        AccessController.doPrivileged(new PrivilegedAction<Void>() {
-            @Override
-            public Void run() {
-                GroovyCodeSource gcs = null;
-                try {
-                    gcs = new GroovyCodeSource(file);
-                } catch (IOException fnfe) {
-                    fail(fnfe.toString());
-                }
-                parseAndExecute(gcs, missingPermission);
-                return null;
+        AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+            GroovyCodeSource gcs = null;
+            try {
+                gcs = new GroovyCodeSource(file);
+            } catch (IOException fnfe) {
+                fail(fnfe.toString());
             }
+            parseAndExecute(gcs, missingPermission);
+            return null;
         });
     }
 
@@ -305,12 +288,9 @@ public abstract class SecurityTestSupport extends GroovyTestCase {
         // Use our privileged access in order to prevent checks lower in the call stack.  Otherwise we would have
         // to grant access to IDE unit test runners and unit test libs.  We only care about testing the call stack
         // higher upstream from this point of execution.
-        AccessController.doPrivileged(new PrivilegedAction<Void>() {
-            @Override
-            public Void run() {
-                parseAndExecute(new GroovyCodeSource(scriptStr, generateClassName(), effectiveCodeBase), missingPermission);
-                return null;
-            }
+        AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+            parseAndExecute(new GroovyCodeSource(scriptStr, generateClassName(), effectiveCodeBase), missingPermission);
+            return null;
         });
     }
 }

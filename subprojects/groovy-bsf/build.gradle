@@ -21,6 +21,6 @@ dependencies {
         exclude(group: 'commons-logging', module: 'commons-logging')
     }
     compile 'commons-logging:commons-logging:1.2'
-    compile rootProject
-    testCompile project(':groovy-test')
+    implementation rootProject
+    testImplementation project(':groovy-test')
 }

@@ -18,9 +18,8 @@
  */
 package groovy.util
 
-/**
-* @author Dierk Koenig
-**/
+import groovy.test.GroovyTestCase
+
 class ProxyTest extends GroovyTestCase {
 
     void testStringDecoration(){

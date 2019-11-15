@@ -59,6 +59,7 @@ import org.codehaus.groovy.ast.stmt.IfStatement;
 import org.codehaus.groovy.ast.stmt.ReturnStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.ast.stmt.ThrowStatement;
+import org.codehaus.groovy.ast.stmt.TryCatchStatement;
 import org.codehaus.groovy.classgen.Verifier;
 import org.codehaus.groovy.control.io.ReaderSource;
 import org.codehaus.groovy.runtime.GeneratedClosure;
@@ -608,6 +609,10 @@ public class GeneralUtils {
         return new BooleanExpression(new BinaryExpression(objectExpression, INSTANCEOF, classX(cNode)));
     }
 
+    public static BooleanExpression isNullX(Expression expr) {
+        return new BooleanExpression(new BinaryExpression(expr, EQ, new ConstantExpression(null)));
+    }
+
     public static BooleanExpression isOneX(Expression expr) {
         return new BooleanExpression(new BinaryExpression(expr, EQ, new ConstantExpression(1)));
     }
@@ -650,6 +655,12 @@ public class GeneralUtils {
         return result;
     }
 
+    public static VariableExpression localVarX(String name, ClassNode type) {
+        VariableExpression result = new VariableExpression(name, type);
+        result.setAccessedVariable(result);
+        return result;
+    }
+
     public static BinaryExpression ltX(Expression lhv, Expression rhv) {
         return new BinaryExpression(lhv, LT, rhv);
     }
@@ -681,6 +692,10 @@ public class GeneralUtils {
 
     public static BinaryExpression neX(Expression lhv, Expression rhv) {
         return new BinaryExpression(lhv, NE, rhv);
+    }
+
+    public static ConstantExpression nullX() {
+        return new ConstantExpression(null);
     }
 
     public static BooleanExpression notNullX(Expression argExpr) {
@@ -715,12 +730,18 @@ public class GeneralUtils {
         return new BinaryExpression(lhv, PLUS, rhv);
     }
 
-    public static Expression propX(Expression owner, String property) {
+    public static PropertyExpression propX(Expression owner, String property) {
         return new PropertyExpression(owner, property);
     }
 
-    public static Expression propX(Expression owner, Expression property) {
+    public static PropertyExpression propX(Expression owner, Expression property) {
         return new PropertyExpression(owner, property);
+    }
+
+    public static PropertyExpression thisPropX(boolean implicit, String property) {
+        PropertyExpression pexp = propX(varX("this"), property);
+        pexp.setImplicitThis(implicit);
+        return pexp;
     }
 
     public static Statement returnS(Expression expr) {
@@ -767,6 +788,14 @@ public class GeneralUtils {
 
     public static CatchStatement catchS(Parameter variable, Statement code) {
         return new CatchStatement(variable, code);
+    }
+
+    public static TryCatchStatement tryCatchS(Statement tryStatement) {
+        return tryCatchS(tryStatement, EmptyStatement.INSTANCE);
+    }
+
+    public static TryCatchStatement tryCatchS(Statement tryStatement, Statement finallyStatement) {
+        return new TryCatchStatement(tryStatement, finallyStatement);
     }
 
     /**
@@ -896,5 +925,4 @@ public class GeneralUtils {
         return ((firstPackage == null && secondPackage == null) ||
                         firstPackage != null && secondPackage != null && firstPackage.getName().equals(secondPackage.getName()));
     }
-
 }

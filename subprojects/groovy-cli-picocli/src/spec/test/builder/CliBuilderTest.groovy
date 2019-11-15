@@ -119,7 +119,7 @@ Description 2
 Options heading:
   -a               option a description
   -b               option b description
-  -c= [PARAM...]   option c description
+  -c=[PARAM...]    option c description
 
 Footer heading:
 Footer 1
@@ -161,7 +161,7 @@ Footer 2
         String expected = '''\
 Usage: ant [options] [targets]
 Options:
-  -D= <property=value>   use value for given property
+  -D=<property=value>    use value for given property
       -help              print this message
       -lib=<path>,<path>,<path>
                          comma-separated list of 3 paths to search for jars and
@@ -188,7 +188,7 @@ Options:
         cli.usage()
 
         String expected = '''\
-Usage: curl [-Gq] [--basic] [--url=<URL>] [-d=<data>]
+Usage: curl [-Gq] [--basic] [-d=<data>] [--url=<URL>]
       --basic         Use HTTP Basic Authentication
   -d, --data=<data>   HTTP POST data
   -G, --get           Send the -d data with a HTTP GET

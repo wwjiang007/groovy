@@ -31,17 +31,11 @@ import java.util.LinkedList;
  * when a class is *fully* statically compiled. In mixed mode, MOP methods are
  * still generated.
  *
- * @author Cédric Champeau
  * @since 2.4.0
  */
 public class StaticCompilationMopWriter extends MopWriter {
 
-    public static final MopWriter.Factory FACTORY = new MopWriter.Factory() {
-        @Override
-        public MopWriter create(final WriterController controller) {
-            return new StaticCompilationMopWriter(controller);
-        }
-    };
+    public static final MopWriter.Factory FACTORY = StaticCompilationMopWriter::new;
 
     private final StaticTypesWriterController controller;
 

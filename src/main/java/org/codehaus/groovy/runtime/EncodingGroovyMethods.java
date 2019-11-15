@@ -26,7 +26,6 @@ import org.codehaus.groovy.runtime.typehandling.DefaultTypeTransformation;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.io.Writer;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
@@ -318,9 +317,9 @@ public class EncodingGroovyMethods {
     public static Writable encodeHex(final byte[] data) {
         return new Writable() {
             public Writer writeTo(Writer out) throws IOException {
-                for (int i = 0; i < data.length; i++) {
+                for (byte datum : data) {
                     // convert byte into unsigned hex string
-                    String hexString = Integer.toHexString(data[i] & 0xFF);
+                    String hexString = Integer.toHexString(datum & 0xFF);
 
                     // add leading zero if the length of the string is one
                     if (hexString.length() < 2) {
@@ -436,6 +435,6 @@ public class EncodingGroovyMethods {
         MessageDigest md = MessageDigest.getInstance(algorithm);
         md.update(ByteBuffer.wrap(self));
 
-        return String.format("%032x", new BigInteger(1, md.digest()));
+        return encodeHex(md.digest()).toString();
     }
 }

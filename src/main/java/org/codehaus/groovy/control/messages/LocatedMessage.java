@@ -24,57 +24,46 @@ import org.codehaus.groovy.syntax.CSTNode;
 
 import java.io.PrintWriter;
 
-
-
 /**
- *  A base class for compilation messages.
- *
- *  @author <a href="mailto:cpoirier@dreaming.org">Chris Poirier</a>
+ * A base class for compilation messages.
  */
+public class LocatedMessage extends SimpleMessage {
 
-public class LocatedMessage extends SimpleMessage
-{
-    protected CSTNode context;  // The CSTNode that indicates the location to which the message applies
-    
-    public LocatedMessage( String message, CSTNode context, SourceUnit source ) 
-    {
-        super( message, source );
+    /** The CSTNode that indicates the location to which the message applies. */
+    private CSTNode context;
+
+    public LocatedMessage(String message, CSTNode context, SourceUnit source) {
+        super(message, source);
         this.context = context;
     }
-    
-    
-    public LocatedMessage( String message, Object data, CSTNode context, SourceUnit source ) 
-    {
-        super( message, data, source );
+
+    public LocatedMessage(String message, Object data, CSTNode context, SourceUnit source) {
+        super(message, data, source);
         this.context = context;
     }
-    
-    
-    public void write( PrintWriter writer, Janitor janitor )
-    {
+
+    public CSTNode getContext() {
+        return context;
+    }
+
+    public void write(PrintWriter writer, Janitor janitor) {
         if (owner instanceof SourceUnit) {
             SourceUnit source = (SourceUnit) owner;
 
-            String name   = source.getName();
-            int    line   = context.getStartLine();
-            int    column = context.getStartColumn();
-            String sample = source.getSample( line, column, janitor );
+            String name = source.getName();
+            int line = context.getStartLine();
+            int column = context.getStartColumn();
+            String sample = source.getSample(line, column, janitor);
 
-            if( sample != null )
-            {
-                writer.println( source.getSample(line, column, janitor) );
+            if (sample != null) {
+                writer.println(source.getSample(line, column, janitor));
             }
 
-            writer.println( name + ": " + line + ": " + this.message );
+            writer.println(name + ": " + line + ": " + this.message);
             writer.println("");
         } else {
-            writer.println( "<No Relevant Source>: " + this.message );
+            writer.println("<No Relevant Source>: " + this.message);
             writer.println("");
         }
     }
-    
 }
-
-
-
-

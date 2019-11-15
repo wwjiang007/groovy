@@ -22,17 +22,17 @@ import org.codehaus.groovy.ast.GroovyCodeVisitor;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 
+import static org.codehaus.groovy.ast.tools.GeneralUtils.nullX;
+
 /**
  * A return statement
- * 
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 public class ReturnStatement extends Statement {
     /**
      * Only used for synthetic return statements emitted by the compiler.
      * For comparisons use isReturningNullOrVoid() instead.
      */
-    public static final ReturnStatement RETURN_NULL_OR_VOID = new ReturnStatement(ConstantExpression.NULL);
+    public static final ReturnStatement RETURN_NULL_OR_VOID = new ReturnStatement(nullX());
 
     private Expression expression;
     

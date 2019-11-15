@@ -19,37 +19,30 @@
 package org.codehaus.groovy.control;
 
 import java.util.HashSet;
-import java.util.Iterator;
 import java.util.Set;
 
 /**
- *  An agent that can be used to defer cleanup operations to 
- *  a later time.  Users much implement the HasCleanup interface.  
- *
- *  @author <a href="mailto:cpoirier@dreaming.org">Chris Poirier</a>
+ * An agent that can be used to defer cleanup operations to
+ * a later time.  Users much implement the HasCleanup interface.
  */
-
-public class Janitor implements HasCleanup
-{
+public class Janitor implements HasCleanup {
     private final Set pending = new HashSet();   // All objects pending cleanup
-    
-    public void register( HasCleanup object )
-    {
-        pending.add( object );
+
+    public void register(HasCleanup object) {
+        pending.add(object);
     }
-    
-    public void cleanup()
-    {
-        Iterator iterator = pending.iterator();
-        while( iterator.hasNext() )
-        {
-            HasCleanup object = (HasCleanup)iterator.next();
-            
-            try { object.cleanup(); } catch( Exception e ) {
+
+    public void cleanup() {
+        for (Object o : pending) {
+            HasCleanup object = (HasCleanup) o;
+
+            try {
+                object.cleanup();
+            } catch (Exception e) {
                 // Ignore
             }
         }
-        
+
         pending.clear();
     }
 }

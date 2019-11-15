@@ -19,12 +19,13 @@
 package org.codehaus.groovy.ast.tools;
 
 import groovy.lang.Closure;
+import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.ClosureExpression;
 import org.codehaus.groovy.control.io.ReaderSource;
+
 /**
  * Handy methods when working with Closure AST data structures.
  */
-
 public class ClosureUtils {
 
     /**
@@ -66,4 +67,17 @@ public class ClosureUtils {
         return typeName.equals("java.lang.String");
     }
 
+    /**
+     * @return true if the ClosureExpression has an implicit 'it' parameter
+     */
+    public static boolean hasImplicitParameter(ClosureExpression ce) {
+        return ce.getParameters() != null && ce.getParameters().length == 0;
+    }
+
+    /**
+     * @return the parameters for the ClosureExpression
+     */
+    public static Parameter[] getParametersSafe(ClosureExpression ce) {
+        return ce.getParameters() != null ? ce.getParameters() : Parameter.EMPTY_ARRAY;
+    }
 }

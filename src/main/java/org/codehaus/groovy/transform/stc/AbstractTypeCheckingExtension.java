@@ -54,14 +54,13 @@ import java.util.logging.Logger;
  * <p>The methods found in this class are made directly available in type checking scripts
  * through the {@link org.codehaus.groovy.transform.stc.GroovyTypeCheckingExtensionSupport} class.</p>
  *
- * @author Cédric Champeau
  * @since 2.3.0
  */
 public class AbstractTypeCheckingExtension extends TypeCheckingExtension {
     private static final Logger LOG = Logger.getLogger(GroovyTypeCheckingExtensionSupport.class.getName());
     protected final TypeCheckingContext context;
-    private final Set<MethodNode> generatedMethods = new LinkedHashSet<MethodNode>();
-    private final LinkedList<TypeCheckingScope> scopeData = new LinkedList<TypeCheckingScope>();
+    private final Set<MethodNode> generatedMethods = new LinkedHashSet<>();
+    private final LinkedList<TypeCheckingScope> scopeData = new LinkedList<>();
     // this boolean is used through setHandled(boolean)
     protected boolean handled = false;
     protected boolean debug = false;

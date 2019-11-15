@@ -27,8 +27,6 @@ import java.util.ResourceBundle;
 /**
  * Message source backed up by one or more {@link java.util.ResourceBundle}
  * instances for simple i18n support.
- *
- * @author <a href="mailto:jason@planet57.com">Jason Dillon</a>
  */
 public class MessageSource
     extends GroovyObjectSupport
@@ -99,16 +97,15 @@ public class MessageSource
         MissingResourceException error = null;
         
         ResourceBundle[] bundles = getBundles();
-        
-        for (int i=0; i<bundles.length; i++) {
+
+        for (ResourceBundle bundle : bundles) {
             try {
-                return bundles[i].getString(code);
-            }
-            catch (MissingResourceException e) {
+                return bundle.getString(code);
+            } catch (MissingResourceException e) {
                 //
                 // FIXME: For now just save the first error, should really roll a new message with all of the details
                 //
-                
+
                 if (error != null) {
                     error = e;
                 }

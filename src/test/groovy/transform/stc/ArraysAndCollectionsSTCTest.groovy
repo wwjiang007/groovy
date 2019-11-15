@@ -21,8 +21,6 @@ package groovy.transform.stc
 
 /**
  * Unit tests for static type checking : arrays and collections.
- *
- * @author Cedric Champeau
  */
 class ArraysAndCollectionsSTCTest extends StaticTypeCheckingTestCase {
 
@@ -403,8 +401,8 @@ class ArraysAndCollectionsSTCTest extends StaticTypeCheckingTestCase {
     void testStringArrayPutWithIncorrectSubType() {
         shouldFailWithMessages '''
             Serializable[] arr = ['abc']
-            arr.putAt(0, new XmlSlurper())
-        ''', 'Cannot call <T,U extends T> java.io.Serializable[]#putAt(int, U) with arguments [int, groovy.util.XmlSlurper]'
+            arr.putAt(0, new groovy.xml.XmlSlurper())
+        ''', 'Cannot call <T,U extends T> java.io.Serializable[]#putAt(int, U) with arguments [int, groovy.xml.XmlSlurper]'
     }
 
     void testArrayGetOnPrimitiveArray() {

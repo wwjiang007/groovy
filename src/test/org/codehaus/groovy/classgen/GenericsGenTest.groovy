@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.classgen
 
+import groovy.test.GroovyTestCase
 import org.codehaus.groovy.tools.*
 import org.codehaus.groovy.control.*
 
@@ -88,6 +89,6 @@ class GenericsGenTest extends GroovyTestCase {
         File tempFile = File.createTempDir(prefix, suffix)
         tempFile.deleteOnExit()
         filesToDelete.add(tempFile)
-        return tempFile;
+        return tempFile
     }
 }

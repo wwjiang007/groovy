@@ -61,8 +61,9 @@ experiments.
                           Define a system property
   -e, --evaluate=<CODE>   Evaluate the code first when starting interactive session
   -h, --help              Display this help message
-      -pa, --parameters   Generate metadata for reflection on method parameter names
+  -pa, --parameters       Generate metadata for reflection on method parameter names
                             (jdk8+ only)
+  -pr, --enable-preview          Enable preview Java features (JEP 12) (jdk12+ only)
   -q, --quiet             Suppress superfluous output
   -T, --terminal=<TYPE>   Specify the terminal TYPE to use
   -v, --verbose           Enable verbose output
@@ -543,12 +544,12 @@ will register the `Stats` command:
 groovy:000> :register Stats
 ----
 
-where the `Stats` class is a class extending the `org.codehaus.groovy.tools.shell.CommandSupport` class. For example:
+where the `Stats` class is a class extending the `org.apache.groovy.groovysh.CommandSupport` class. For example:
 
 [source,groovy]
 ----
-import org.codehaus.groovy.tools.shell.CommandSupport
-import org.codehaus.groovy.tools.shell.Groovysh
+import org.apache.groovy.groovysh.CommandSupport
+import org.apache.groovy.groovysh.Groovysh
 
 class Stats extends CommandSupport {
     protected Stats(final Groovysh shell) {

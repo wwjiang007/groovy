@@ -29,10 +29,10 @@ import org.codehaus.groovy.runtime.InvokerHelper;
 import java.security.AccessController;
 import java.security.PrivilegedAction;
 
+
 public final class CallSiteArray {
     public final CallSite[] array;
-
-    public static final Object [] NOPARAM = new Object[0];
+    public static final Object[] NOPARAM = new Object[0];
     public final Class owner;
 
     public CallSiteArray(Class owner, String [] names) {
@@ -61,15 +61,13 @@ public final class CallSiteArray {
 
     private static CallSite createCallStaticSite(CallSite callSite, final Class receiver, Object[] args) {
         CallSite site;
-        AccessController.doPrivileged(new PrivilegedAction<Void>() {
-            public Void run() {
-                try {
-                    Class.forName(receiver.getName(), true, receiver.getClassLoader());
-                } catch (Exception e) {
-                    // force <clinit>
-                }
-                return null;
+        AccessController.doPrivileged((PrivilegedAction<Void>) () -> {
+            try {
+                Class.forName(receiver.getName(), true, receiver.getClassLoader());
+            } catch (Exception e) {
+                // force <clinit>
             }
+            return null;
         });
         MetaClass metaClass = InvokerHelper.getMetaClass(receiver);
         if (metaClass instanceof MetaClassImpl) {

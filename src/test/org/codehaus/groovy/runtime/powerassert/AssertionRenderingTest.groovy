@@ -18,13 +18,13 @@
  */
 package org.codehaus.groovy.runtime.powerassert
 
+import groovy.test.GroovyTestCase
+
 import static AssertionTestUtil.*
 import static java.lang.Math.min
 
 /**
  * Tests rendering of whole assertions.
- *
- * @author Peter Niederwieser
  */
 
 class AssertionRenderingTest extends GroovyTestCase {
@@ -342,14 +342,14 @@ assert (a..<b) == null
 
     void testPropertyExpression() {
         isRendered """
-assert a.size == null
-       | |    |
-       | 1    false
-       [9]
+assert a.bytes == null
+       | |     |
+       | [65]  false
+       'A'
 
         """, {
-            def a = [9]
-            assert a.size == null
+            def a = 'A'
+            assert a.bytes == null
         }
 
         isRendered """

@@ -22,13 +22,13 @@ import org.codehaus.groovy.antlr.GroovySourceAST;
 import org.codehaus.groovy.antlr.parser.GroovyTokenTypes;
 import org.codehaus.groovy.antlr.treewalker.VisitorAdapter;
 
+@Deprecated
 public class Java2GroovyConverter extends VisitorAdapter{
     private final int[] typeMapping;
 
     public Java2GroovyConverter(String[] tokenNames) {
         typeMapping = new int[400]; // magic number, much greater than current number of java tokens
         typeMapping[JavaTokenTypes.ABSTRACT] = GroovyTokenTypes.ABSTRACT;
-
         typeMapping[JavaTokenTypes.EOF] = GroovyTokenTypes.EOF;
         typeMapping[JavaTokenTypes.NULL_TREE_LOOKAHEAD] = GroovyTokenTypes.NULL_TREE_LOOKAHEAD;
         typeMapping[JavaTokenTypes.BLOCK] = GroovyTokenTypes.BLOCK;
@@ -66,7 +66,6 @@ public class Java2GroovyConverter extends VisitorAdapter{
         typeMapping[JavaTokenTypes.FOR_ITERATOR] = GroovyTokenTypes.FOR_ITERATOR;
         typeMapping[JavaTokenTypes.EMPTY_STAT] = GroovyTokenTypes.EMPTY_STAT;
         typeMapping[JavaTokenTypes.FINAL] = GroovyTokenTypes.FINAL;
-        typeMapping[JavaTokenTypes.ABSTRACT] = GroovyTokenTypes.ABSTRACT;
         typeMapping[JavaTokenTypes.STRICTFP] = GroovyTokenTypes.STRICTFP;
         typeMapping[JavaTokenTypes.SUPER_CTOR_CALL] = GroovyTokenTypes.SUPER_CTOR_CALL;
         typeMapping[JavaTokenTypes.CTOR_CALL] = GroovyTokenTypes.CTOR_CALL;

@@ -41,6 +41,7 @@ import org.objectweb.asm.Opcodes;
 
 import java.util.List;
 
+import static org.apache.groovy.ast.tools.ClassNodeUtils.addGeneratedConstructor;
 import static org.codehaus.groovy.ast.ClassHelper.CLOSURE_TYPE;
 
 public class InnerClassCompletionVisitor extends InnerClassVisitorHelper implements Opcodes {
@@ -71,8 +72,8 @@ public class InnerClassCompletionVisitor extends InnerClassVisitorHelper impleme
             innerClass = (InnerClassNode) node;
             thisField = innerClass.getField("this$0");
             if (innerClass.getVariableScope() == null && innerClass.getDeclaredConstructors().isEmpty()) {
-                // add dummy constructor
-                innerClass.addConstructor(ACC_PUBLIC, Parameter.EMPTY_ARRAY, null, null);
+                // add empty default constructor
+                addGeneratedConstructor(innerClass, ACC_PUBLIC, Parameter.EMPTY_ARRAY, null, null);
             }
         }
         if (node.isEnum() || node.isInterface()) return;
@@ -159,7 +160,7 @@ public class InnerClassCompletionVisitor extends InnerClassVisitorHelper impleme
 
     private void getThis(MethodVisitor mv, String classInternalName, String outerClassDescriptor, String innerClassInternalName) {
         mv.visitVarInsn(ALOAD, 0);
-        if (CLOSURE_TYPE.equals(thisField.getType())) {
+        if (thisField != null && CLOSURE_TYPE.equals(thisField.getType())) {
             mv.visitFieldInsn(GETFIELD, classInternalName, "this$0", CLOSURE_DESCRIPTOR);
             mv.visitMethodInsn(INVOKEVIRTUAL, CLOSURE_INTERNAL_NAME, "getThisObject", "()Ljava/lang/Object;", false);
             mv.visitTypeInsn(CHECKCAST, innerClassInternalName);
@@ -167,12 +168,12 @@ public class InnerClassCompletionVisitor extends InnerClassVisitorHelper impleme
             mv.visitFieldInsn(GETFIELD, classInternalName, "this$0", outerClassDescriptor);
         }
     }
-    
+
     private void addDefaultMethods(InnerClassNode node) {
         final boolean isStatic = isStatic(node);
 
         ClassNode outerClass = node.getOuterClass();
-        final String classInternalName = org.codehaus.groovy.classgen.asm.BytecodeHelper.getClassInternalName(node);
+        final String classInternalName = BytecodeHelper.getClassInternalName(node);
         final String outerClassInternalName = getInternalName(outerClass, isStatic);
         final String outerClassDescriptor = getTypeDescriptor(outerClass, isStatic);
         final int objectDistance = getObjectDistance(outerClass);
@@ -348,12 +349,21 @@ public class InnerClassCompletionVisitor extends InnerClassVisitorHelper impleme
     private void addCompilationErrorOnCustomMethodNode(InnerClassNode node, String methodName, Parameter[] parameters) {
         MethodNode existingMethodNode = node.getMethod(methodName, parameters);
         // if there is a user-defined methodNode, add compiler error msg and continue
-        if (existingMethodNode != null && !existingMethodNode.isSynthetic())  {
+        if (existingMethodNode != null && !isSynthetic(existingMethodNode))  {
             addError("\"" +methodName + "\" implementations are not supported on static inner classes as " +
                     "a synthetic version of \"" + methodName + "\" is added during compilation for the purpose " +
                     "of outer class delegation.",
                     existingMethodNode);
         }
+    }
+
+    // GROOVY-8914: pre-compiled classes lose synthetic boolean - TODO fix earlier as per GROOVY-4346 then remove extra check here
+    private boolean isSynthetic(MethodNode existingMethodNode) {
+        return existingMethodNode.isSynthetic() || hasSyntheticModifier(existingMethodNode);
+    }
+
+    private boolean hasSyntheticModifier(MethodNode existingMethodNode) {
+        return (existingMethodNode.getModifiers() & Opcodes.ACC_SYNTHETIC) != 0;
     }
 
     private void addThisReference(ConstructorNode node) {

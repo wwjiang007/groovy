@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.transform
 
+import groovy.test.GroovyShellTestCase
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
 import org.junit.After
 import org.junit.Before
@@ -1076,6 +1077,27 @@ class ImmutableTransformTest extends GroovyShellTestCase {
             assert p2.x == 1
             def p3 = new Point(new TreeMap(coordinates))
             assert p3.x == 1
+        '''
+    }
+
+    // GROOVY-8967
+    @Test
+    void testPropertiesWithDefaultValues() {
+        assertScript '''
+            import groovy.transform.*
+
+            @Immutable
+            class Thing {
+                int i = 42
+                Date d = new Date()
+                Collection c = [42]
+                String value = "default"
+            }
+
+            def thing = new Thing()
+            assert thing.with{ [i, c, d.class, value] } == [42, [42], Date, 'default']
+            thing = new Thing(c: null, d: null, value: null, i: -1)
+            assert thing.with{ [i, c, d, value] } == [-1, null, null, null]
         '''
     }
 }

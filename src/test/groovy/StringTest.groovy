@@ -18,10 +18,10 @@
  */
 package groovy
 
+import groovy.test.GroovyTestCase
+
 /**
  * Various tests for Strings.
- *
- * @author Michael Baehr
  */
 class StringTest extends GroovyTestCase {
 

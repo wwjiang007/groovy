@@ -18,16 +18,14 @@
  */
 package groovy.transform.stc
 
-import org.codehaus.groovy.control.ParserVersion
+import org.codehaus.groovy.antlr.AntlrParserPluginFactory
 
 /**
  * Units tests aimed at testing the behavior of {@link DelegatesTo} in combination
  * with static type checking.
- *
- * @author Cedric Champeau
- * @author <a href="mailto:blackdrag@gmx.org">Jochen "blackdrag" Theodorou</a>
  */
 class DelegatesToSTCTest extends StaticTypeCheckingTestCase {
+
     void testShouldChooseMethodFromOwner() {
         assertScript '''
             class Delegate {
@@ -638,7 +636,7 @@ class DelegatesToSTCTest extends StaticTypeCheckingTestCase {
 
         String msg = 'Cannot find matching method'
 
-        if (ParserVersion.V_2 == config.parserVersion) {
+        if (config.pluginFactory instanceof AntlrParserPluginFactory) {
             shouldFailWithMessages code, msg
         } else {
             /*
@@ -651,7 +649,6 @@ class DelegatesToSTCTest extends StaticTypeCheckingTestCase {
              */
             shouldFailWithMessages code, msg, msg
         }
-
     }
 
     // GROOVY-6323, GROOVY-6325, GROOVY-6332
@@ -734,11 +731,11 @@ class DelegatesToSTCTest extends StaticTypeCheckingTestCase {
 
             class Builder {
               def <T> T configure(@DelegatesTo.Target Class<T> target, @DelegatesTo(genericTypeIndex=0) Closure cl) {
-                def obj = target.newInstance() 
+                def obj = target.newInstance()
                 cl.delegate = obj
                 cl.resolveStrategy = Closure.DELEGATE_FIRST
                 cl.call()
-                obj 
+                obj
               }
             }
 
@@ -746,7 +743,7 @@ class DelegatesToSTCTest extends StaticTypeCheckingTestCase {
               void run() {
                 def builder = new Builder()
                 def car = builder.configure(Car) {
-                  brand = brand 
+                  brand = brand
                 }
               }
             }
@@ -829,4 +826,3 @@ class DelegatesToSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 }
-

@@ -34,15 +34,10 @@ import org.objectweb.asm.ClassVisitor;
 import org.objectweb.asm.MethodVisitor;
 import org.objectweb.asm.Opcodes;
 
-import java.util.Iterator;
-
 /**
  * To generate a class that has all the fields and methods, except that fields are not initialized
  * and methods are empty. It's intended for being used as a place holder during code generation
  * of reference to the "this" class itself.
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
- * @author <a href="mailto:b55r@sina.com">Bing Ran</a>
  */
 public class DummyClassGenerator extends ClassGenerator {
 
@@ -87,8 +82,7 @@ public class DummyClassGenerator extends ClassGenerator {
 
             classNode.visitContents(this);
 
-            for (Iterator iter = innerClasses.iterator(); iter.hasNext();) {
-                ClassNode innerClass = (ClassNode) iter.next();
+            for (ClassNode innerClass : innerClasses) {
                 ClassNode innerClassType = innerClass;
                 String innerClassInternalName = BytecodeHelper.getClassInternalName(innerClassType);
                 String outerClassName = internalClassName; // default for inner classes
@@ -166,8 +160,8 @@ public class DummyClassGenerator extends ClassGenerator {
     }
 
     protected void visitParameters(ASTNode node, Parameter[] parameters) {
-        for (int i = 0, size = parameters.length; i < size; i++) {
-            visitParameter(node, parameters[i]);
+        for (Parameter parameter : parameters) {
+            visitParameter(node, parameter);
         }
     }
 

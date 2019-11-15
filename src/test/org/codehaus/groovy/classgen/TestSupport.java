@@ -18,8 +18,12 @@
  */
 package org.codehaus.groovy.classgen;
 
-import groovy.lang.*;
-import groovy.util.GroovyTestCase;
+import groovy.lang.Binding;
+import groovy.lang.GroovyClassLoader;
+import groovy.lang.GroovyCodeSource;
+import groovy.lang.GroovyObject;
+import groovy.lang.Script;
+import groovy.test.GroovyTestCase;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.CompileUnit;
 import org.codehaus.groovy.ast.FieldNode;
@@ -45,8 +49,6 @@ import java.security.PrivilegedAction;
 
 /**
  * Base class for test cases
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
  */
 @Ignore("base class for tests")
 public class TestSupport extends GroovyTestCase implements Opcodes {
@@ -57,12 +59,7 @@ public class TestSupport extends GroovyTestCase implements Opcodes {
     final ClassLoader parentLoader = getClass().getClassLoader();
     protected final GroovyClassLoader loader =
             AccessController.doPrivileged(
-                    new PrivilegedAction<GroovyClassLoader>() {
-                        @Override
-                        public GroovyClassLoader run() {
-                            return new GroovyClassLoader(parentLoader);
-                        }
-                    }
+                    (PrivilegedAction<GroovyClassLoader>) () -> new GroovyClassLoader(parentLoader)
             );
     final CompileUnit unit = new CompileUnit(loader, new CompilerConfiguration());
     final ModuleNode module = new ModuleNode(unit);
@@ -151,12 +148,7 @@ public class TestSupport extends GroovyTestCase implements Opcodes {
         log.info("About to execute script");
         log.info(text);
         GroovyCodeSource gcs = AccessController.doPrivileged(
-                new PrivilegedAction<GroovyCodeSource>() {
-                    @Override
-                    public GroovyCodeSource run() {
-                        return new GroovyCodeSource(text, scriptName, "/groovy/testSupport");
-                    }
-                }
+                (PrivilegedAction<GroovyCodeSource>) () -> new GroovyCodeSource(text, scriptName, "/groovy/testSupport")
         );
         Class groovyClass = loader.parseClass(gcs);
         Script script = InvokerHelper.createScript(groovyClass, new Binding());
@@ -172,7 +164,7 @@ public class TestSupport extends GroovyTestCase implements Opcodes {
 
     protected GroovyObject compile(String fileName) throws Exception {
         Class groovyClass = loader.parseClass(new GroovyCodeSource(new File(fileName)));
-        GroovyObject object = (GroovyObject) groovyClass.newInstance();
+        GroovyObject object = (GroovyObject) groovyClass.getDeclaredConstructor().newInstance();
         assertTrue(object != null);
         return object;
     }

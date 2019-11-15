@@ -188,10 +188,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         // we only do check abstract classes (including enums), no interfaces or non-abstract classes
         if (!isAbstract(node.getModifiers()) || isInterface(node.getModifiers())) return;
 
-        List<MethodNode> abstractMethods = node.getAbstractMethods();
-        if (abstractMethods == null || abstractMethods.isEmpty()) return;
-
-        for (MethodNode method : abstractMethods) {
+        for (MethodNode method : node.getAbstractMethods()) {
             if (method.isPrivate()) {
                 addError("Method '" + method.getName() + "' from " + getDescription(node) +
                         " must not be private as it is declared as an abstract method.", method);
@@ -201,10 +198,15 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
 
     private void checkNoAbstractMethodsNonabstractClass(ClassNode node) {
         if (isAbstract(node.getModifiers())) return;
-        List<MethodNode> abstractMethods = node.getAbstractMethods();
-        if (abstractMethods == null) return;
-        for (MethodNode method : abstractMethods) {
+        for (MethodNode method : node.getAbstractMethods()) {
             MethodNode sameArgsMethod = node.getMethod(method.getName(), method.getParameters());
+            if (null == sameArgsMethod) {
+                sameArgsMethod = ClassHelper.GROOVY_OBJECT_TYPE.getMethod(method.getName(), method.getParameters());
+                if (null != sameArgsMethod && !sameArgsMethod.isAbstract() && method.getReturnType().equals(sameArgsMethod.getReturnType())) {
+                    return;
+                }
+            }
+
             if (sameArgsMethod==null || method.getReturnType().equals(sameArgsMethod.getReturnType())) {
                 addError("Can't have an abstract method in a non-abstract class." +
                         " The " + getDescription(node) + " must be declared abstract or" +
@@ -411,7 +413,7 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         msg.append(" in ");
         msg.append(superMethod.getDeclaringClass().getName());
         msg.append("; attempting to assign weaker access privileges; was ");
-        msg.append(superMethod.isPublic() ? "public" : "protected");
+        msg.append(superMethod.isPublic() ? "public" : (superMethod.isProtected() ? "protected" : "package-private"));
         addError(msg.toString(), method);
     }
 
@@ -463,8 +465,9 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
         for (MethodNode superMethod : cn.getSuperClass().getMethods(mn.getName())) {
             Parameter[] superParams = superMethod.getParameters();
             if (!hasEqualParameterTypes(params, superParams)) continue;
-            if ((mn.isPrivate() && !superMethod.isPrivate()) ||
-                    (mn.isProtected() && superMethod.isPublic())) {
+            if ((mn.isPrivate() && !superMethod.isPrivate())
+                    || (mn.isProtected() && !superMethod.isProtected() && !superMethod.isPackageScope() && !superMethod.isPrivate())
+                    || (!mn.isPrivate() && !mn.isProtected() && !mn.isPublic() && (superMethod.isPublic() || superMethod.isProtected()))) {
                 addWeakerAccessError(cn, mn, params, superMethod);
                 return;
             }
@@ -701,20 +704,20 @@ public class ClassCompletionVerifier extends ClassCodeVisitorSupport {
             checkGenericsUsage(ref, node);
         }
     }
-    
+
     private void checkGenericsUsage(ASTNode ref, Parameter[] params) {
         for (Parameter p : params) {
             checkGenericsUsage(ref, p.getType());
         }
     }
-    
+
     private void checkGenericsUsage(ASTNode ref, ClassNode node) {
         if (node.isArray()) {
             checkGenericsUsage(ref, node.getComponentType());
         } else if (!node.isRedirectNode() && node.isUsingGenerics()) {
-            addError(   
+            addError(
                     "A transform used a generics containing ClassNode "+ node + " " +
-                    "for "+getRefDescriptor(ref) + 
+                    "for "+getRefDescriptor(ref) +
                     "directly. You are not supposed to do this. " +
                     "Please create a new ClassNode referring to the old ClassNode " +
                     "and use the new ClassNode instead of the old one. Otherwise " +

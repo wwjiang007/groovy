@@ -18,6 +18,8 @@
  */
 package groovy.bugs
 
+import groovy.test.GroovyTestCase
+
 class Groovy8764Bug extends GroovyTestCase {
     void testDgmMethodInClosureInAnonymousInnerClass() {
         assertScript '''
@@ -44,8 +46,9 @@ class Groovy8764Bug extends GroovyTestCase {
 
     void testDgmMethodInClosureInInnerClass() {
         assertScript '''
-        import groovy.transform.*
-        import java.util.function.Function
+            import groovy.transform.*
+            import java.util.function.Function
+            import static groovy.test.GroovyAssert.isAtLeastJdk
 
             @CompileStatic
             class Outer {
@@ -62,7 +65,12 @@ class Groovy8764Bug extends GroovyTestCase {
 
             def oi = new Outer.Inner()
             assert !oi.test(0)
-            assert oi.test(1).value == 1
+            if (isAtLeastJdk('9.0')) {
+                assert oi.test(1).get() == 1
+            } else {
+                // confirm accessing private field okay on older JDK versions
+                assert oi.test(1).value == 1
+            }
         '''
     }
 }

@@ -50,7 +50,6 @@ import org.objectweb.asm.MethodVisitor;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -151,10 +150,10 @@ public class InvocationWriter {
         int opcode = INVOKEVIRTUAL;
         if (target.isStatic()) {
             opcode = INVOKESTATIC;
-        } else if (target.isPrivate() || ((receiver instanceof VariableExpression && ((VariableExpression) receiver).isSuperExpression()))) {
-            opcode = INVOKESPECIAL;
         } else if (declaringClass.isInterface()) {
             opcode = INVOKEINTERFACE;
+        } else if (target.isPrivate() || ((receiver instanceof VariableExpression && ((VariableExpression) receiver).isSuperExpression()))) {
+            opcode = INVOKESPECIAL;
         }
 
         // handle receiver
@@ -718,16 +717,14 @@ public class InvocationWriter {
     private static List<ConstructorNode> sortConstructors(ConstructorCallExpression call, ClassNode callNode) {
         // sort in a new list to prevent side effects
         List<ConstructorNode> constructors = new ArrayList<ConstructorNode>(callNode.getDeclaredConstructors());
-        Comparator comp = new Comparator() {
-            public int compare(Object arg0, Object arg1) {
-                ConstructorNode c0 = (ConstructorNode) arg0;
-                ConstructorNode c1 = (ConstructorNode) arg1;
-                String descriptor0 = BytecodeHelper.getMethodDescriptor(ClassHelper.VOID_TYPE, c0.getParameters());
-                String descriptor1 = BytecodeHelper.getMethodDescriptor(ClassHelper.VOID_TYPE, c1.getParameters());
-                return descriptor0.compareTo(descriptor1);
-            }
+        Comparator comp = (arg0, arg1) -> {
+            ConstructorNode c0 = (ConstructorNode) arg0;
+            ConstructorNode c1 = (ConstructorNode) arg1;
+            String descriptor0 = BytecodeHelper.getMethodDescriptor(ClassHelper.VOID_TYPE, c0.getParameters());
+            String descriptor1 = BytecodeHelper.getMethodDescriptor(ClassHelper.VOID_TYPE, c1.getParameters());
+            return descriptor0.compareTo(descriptor1);
         };
-        Collections.sort(constructors, comp);
+        constructors.sort(comp);
         return constructors;
     }
 
@@ -812,8 +809,8 @@ public class InvocationWriter {
         Label defaultLabel = new Label();
         Label afterSwitch = new Label();
         mv.visitLookupSwitchInsn(defaultLabel, indices, targets);
-        for (int i = 0; i < targets.length; i++) {
-            mv.visitLabel(targets[i]);
+        for (Label target : targets) {
+            mv.visitLabel(target);
             // to keep the stack height, we need to leave
             // one Object[] on the stack as last element. At the
             // same time, we need the Object[] on top of the stack
@@ -847,13 +844,13 @@ public class InvocationWriter {
             // vargs need special attention and transformation though
             Parameter[] parameters = cn.getParameters();
             int lengthWithoutVargs = parameters.length;
-            if (parameters.length>0 && parameters[parameters.length-1].getType().isArray()) {
+            if (parameters.length > 0 && parameters[parameters.length - 1].getType().isArray()) {
                 lengthWithoutVargs--;
             }
             for (int p = 0; p < lengthWithoutVargs; p++) {
                 loadAndCastElement(operandStack, mv, parameters, p);
             }
-            if (parameters.length>lengthWithoutVargs) {
+            if (parameters.length > lengthWithoutVargs) {
                 ClassNode type = parameters[lengthWithoutVargs].getType();
                 BytecodeHelper.pushConstant(mv, lengthWithoutVargs);
                 controller.getAcg().visitClassExpression(new ClassExpression(type));
@@ -909,12 +906,11 @@ public class InvocationWriter {
     // we match only on the number of arguments, not anything else
     private static ConstructorNode getMatchingConstructor(List<ConstructorNode> constructors, List<Expression> argumentList) {
         ConstructorNode lastMatch = null;
-        for (int i=0; i<constructors.size(); i++) {
-            ConstructorNode cn = constructors.get(i);
+        for (ConstructorNode cn : constructors) {
             Parameter[] params = cn.getParameters();
             // if number of parameters does not match we have no match
-            if (argumentList.size()!=params.length) continue;
-            if (lastMatch==null) {
+            if (argumentList.size() != params.length) continue;
+            if (lastMatch == null) {
                 lastMatch = cn;
             } else {
                 // we already had a match so we don't make a direct call at all

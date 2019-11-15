@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.transform.classloading
 
+import groovy.test.GroovyTestCase
 import junit.framework.TestCase
 import org.codehaus.groovy.ast.ASTNode
 import org.codehaus.groovy.ast.ModuleNode
@@ -29,6 +30,7 @@ import org.codehaus.groovy.transform.GroovyASTTransformationClass
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
 import org.codehaus.groovy.transform.GlobalTestTransformClassLoader
+import org.codehaus.groovy.vmplugin.VMPluginFactory
 import org.objectweb.asm.ClassVisitor
 
 import java.lang.annotation.Retention
@@ -43,7 +45,7 @@ import java.lang.annotation.ElementType
  */
 class TransformsAndCustomClassLoadersTest extends GroovyTestCase {
     URL[] urls = collectUrls(getClass().classLoader) + addGroovyUrls()
-    GroovyClassLoader dependencyLoader = new GroovyClassLoader(new URLClassLoader(urls, (ClassLoader)null))
+    GroovyClassLoader dependencyLoader = new GroovyClassLoader(new URLClassLoader(urls, (ClassLoader) ( VMPluginFactory.getPlugin().getVersion() >= 9 ? ClassLoader.getPlatformClassLoader() : null )))
     GroovyClassLoader transformLoader = new GroovyClassLoader(new URLClassLoader(urls, new GroovyOnlyClassLoader()))
 
     private static addGroovyUrls() {

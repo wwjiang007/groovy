@@ -90,12 +90,14 @@ public class ProxyGeneratorAdapter extends ClassVisitor implements Opcodes {
 
     private static final String CLOSURES_MAP_FIELD = "$closures$delegate$map";
     private static final String DELEGATE_OBJECT_FIELD = "$delegate";
+
     private static List<Method> OBJECT_METHODS = getInheritedMethods(Object.class, new ArrayList<Method>());
     private static List<Method> GROOVYOBJECT_METHODS = getInheritedMethods(GroovyObject.class, new ArrayList<Method>());
 
     private static final AtomicLong pxyCounter = new AtomicLong();
     private static final Set<String> GROOVYOBJECT_METHOD_NAMESS;
     private static final Object[] EMPTY_ARGS = new Object[0];
+    private static final String[] EMPTY_STRING_ARRAY = new String[0];
 
     static {
         List<String> names = new ArrayList<String>();
@@ -250,11 +252,7 @@ public class ProxyGeneratorAdapter extends ClassVisitor implements Opcodes {
     }
 
     private static InnerLoader createInnerLoader(final ClassLoader parent, final Class[] interfaces) {
-        return AccessController.doPrivileged(new PrivilegedAction<InnerLoader>() {
-            public InnerLoader run() {
-                return new InnerLoader(parent, interfaces);
-            }
-        });
+        return AccessController.doPrivileged((PrivilegedAction<InnerLoader>) () -> new InnerLoader(parent, interfaces));
     }
 
     private InnerLoader findClassLoader(Class clazz, Class[] interfaces) {
@@ -341,7 +339,7 @@ public class ProxyGeneratorAdapter extends ClassVisitor implements Opcodes {
             classList.add(GeneratedGroovyProxy.class);
             interfacesSet.add("groovy/lang/GeneratedGroovyProxy");
         }
-        super.visit(V1_5, ACC_PUBLIC, proxyName, signature, BytecodeHelper.getClassInternalName(superClass), interfacesSet.toArray(new String[0]));
+        super.visit(V1_5, ACC_PUBLIC, proxyName, signature, BytecodeHelper.getClassInternalName(superClass), interfacesSet.toArray(EMPTY_STRING_ARRAY));
         visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         addDelegateFields();
         if (addGroovyObjectSupport) {
@@ -438,59 +436,6 @@ public class ProxyGeneratorAdapter extends ClassVisitor implements Opcodes {
             mv.visitFieldInsn(GETFIELD, proxyName, "metaClass", "Lgroovy/lang/MetaClass;");
             mv.visitInsn(ARETURN);
             mv.visitMaxs(2, 1);
-            mv.visitEnd();
-        }
-
-        // getProperty
-        {
-            mv = super.visitMethod(ACC_PUBLIC, "getProperty", "(Ljava/lang/String;)Ljava/lang/Object;", null, null);
-            mv.visitCode();
-            mv.visitIntInsn(ALOAD, 0);
-            mv.visitMethodInsn(INVOKEINTERFACE, "groovy/lang/GroovyObject", "getMetaClass", "()Lgroovy/lang/MetaClass;", true);
-            mv.visitIntInsn(ALOAD, 0);
-            mv.visitVarInsn(ALOAD, 1);
-            mv.visitMethodInsn(INVOKEINTERFACE, "groovy/lang/MetaClass", "getProperty", "(Ljava/lang/Object;Ljava/lang/String;)Ljava/lang/Object;", true);
-            mv.visitInsn(ARETURN);
-            mv.visitMaxs(3, 2);
-            mv.visitEnd();
-        }
-
-        // setProperty
-        {
-            mv = super.visitMethod(ACC_PUBLIC, "setProperty", "(Ljava/lang/String;Ljava/lang/Object;)V", null, null);
-            mv.visitCode();
-            Label l0 = new Label();
-            mv.visitLabel(l0);
-            mv.visitVarInsn(ALOAD, 0);
-            mv.visitMethodInsn(INVOKEVIRTUAL, proxyName, "getMetaClass", "()Lgroovy/lang/MetaClass;", false);
-            mv.visitVarInsn(ALOAD, 0);
-            mv.visitVarInsn(ALOAD, 1);
-            mv.visitVarInsn(ALOAD, 2);
-            mv.visitMethodInsn(INVOKEINTERFACE, "groovy/lang/MetaClass", "setProperty", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Object;)V", true);
-            Label l1 = new Label();
-            mv.visitLabel(l1);
-            mv.visitInsn(RETURN);
-            Label l2 = new Label();
-            mv.visitLabel(l2);
-            mv.visitMaxs(4, 3);
-            mv.visitEnd();
-        }
-
-        // invokeMethod
-        {
-            mv = super.visitMethod(ACC_PUBLIC, "invokeMethod", "(Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/Object;", null, null);
-            Label l0 = new Label();
-            mv.visitLabel(l0);
-            mv.visitVarInsn(ALOAD, 0);
-            mv.visitMethodInsn(INVOKEVIRTUAL, proxyName, "getMetaClass", "()Lgroovy/lang/MetaClass;", false);
-            mv.visitVarInsn(ALOAD, 0);
-            mv.visitVarInsn(ALOAD, 1);
-            mv.visitVarInsn(ALOAD, 2);
-            mv.visitMethodInsn(INVOKEINTERFACE, "groovy/lang/MetaClass", "invokeMethod", "(Ljava/lang/Object;Ljava/lang/String;Ljava/lang/Object;)Ljava/lang/Object;", true);
-            mv.visitInsn(ARETURN);
-            Label l1 = new Label();
-            mv.visitLabel(l1);
-            mv.visitMaxs(4, 3);
             mv.visitEnd();
         }
 

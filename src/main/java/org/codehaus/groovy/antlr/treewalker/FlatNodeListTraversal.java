@@ -22,13 +22,10 @@ import antlr.collections.AST;
 import org.codehaus.groovy.antlr.AntlrASTProcessor;
 import org.codehaus.groovy.antlr.GroovySourceAST;
 
-import java.util.Iterator;
 import java.util.List;
 
 /**
  * A simple iterator over an ordered (flat) List of the nodes of the AST.
- *
- * @author <a href="mailto:groovy@ross-rayner.com">Jeremy Rayner</a>
  */
 public class FlatNodeListTraversal extends TraversalHelper {
     
@@ -46,10 +43,9 @@ public class FlatNodeListTraversal extends TraversalHelper {
         List listOfAllNodesInThisAST = collector.getNodes();
         
         // process each node in turn
-        setUp(node);        
-        Iterator itr = listOfAllNodesInThisAST.iterator();
-        while (itr.hasNext()) {
-            GroovySourceAST currentNode = (GroovySourceAST) itr.next();
+        setUp(node);
+        for (Object o : listOfAllNodesInThisAST) {
+            GroovySourceAST currentNode = (GroovySourceAST) o;
             accept(currentNode);
         }
         tearDown(node);

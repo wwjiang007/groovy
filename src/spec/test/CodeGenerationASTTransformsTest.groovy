@@ -1,3 +1,5 @@
+import groovy.test.GroovyTestCase
+
 /*
  *  Licensed to the Apache Software Foundation (ASF) under one
  *  or more contributor license agreements.  See the NOTICE file
@@ -325,7 +327,7 @@ class Person extends Living {
 }
 
 def p1 = new Person(race:'Human', firstName: 'Jack', lastName: 'Nicholson')
-def p2 = new Person(race: 'Human beeing', firstName: 'Jack', lastName: 'Nicholson')
+def p2 = new Person(race: 'Human being', firstName: 'Jack', lastName: 'Nicholson')
 
 assert p1!=p2
 assert p1.hashCode() != p2.hashCode()
@@ -401,8 +403,10 @@ import groovy.transform.Immutable
 
 @Immutable
 class SlowHashCode {
+    static final SLEEP_PERIOD = 500
+
     int hashCode() {
-        sleep 100
+        sleep SLEEP_PERIOD
         127
     }
 }
@@ -418,7 +422,7 @@ p.hashCode()
 
 def start = System.currentTimeMillis()
 p.hashCode()
-assert System.currentTimeMillis() - start < 100
+assert System.currentTimeMillis() - start < SlowHashCode.SLEEP_PERIOD
 // end::equalshashcode_example_cache[]
 '''
     }

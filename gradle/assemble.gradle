@@ -113,7 +113,7 @@ ext.allManifest = manifest {
             'Bundle-ClassPath': '.',
             'Eclipse-BuddyPolicy': 'dependent',
             'DynamicImport-Package': '*',
-            'Main-class': 'groovy.ui.GroovyMain')
+            'Main-Class': 'groovy.ui.GroovyMain')
 }
 
 ext.groovyOsgiManifest = {
@@ -136,7 +136,7 @@ ext.subprojectOsgiManifest = {
     // Exclude attributes not needed for subprojects.
     from(allManifest) {
         eachEntry { details ->
-            if (details.key in [*excludedFromManifest, 'Bnd-LastModified', 'Extension-Name', 'Bundle-Name', 'Bundle-Description', 'Main-class']) {
+            if (details.key in [*excludedFromManifest, 'Bnd-LastModified', 'Extension-Name', 'Bundle-Name', 'Bundle-Description', 'Main-Class']) {
                 details.exclude()
             }
         }
@@ -230,11 +230,11 @@ allprojects {
                     'picocli.**': 'groovyjarjarpicocli.@1'
             ]
             excludesPerLibrary = [
-                    '*': ['META-INF/maven/**', 'META-INF/*', 'META-INF/services/javax.annotation.processing.Processor', 'module-info.class']
+                    '*': ['META-INF/maven/**', 'META-INF/*', 'META-INF/services/javax.annotation.processing.Processor', '**/module-info.class']
             ]
             includesPerLibrary = [
                     'asm-util': ['org/objectweb/asm/util/Printer.class',
-                                 'org/objectweb/asm/util/Textifier.class',
+                                 'org/objectweb/asm/util/Textifier*',
                                  'org/objectweb/asm/util/ASMifier.class',
                                  'org/objectweb/asm/util/Trace*']
             ]
@@ -368,7 +368,8 @@ ext.distSpec = copySpec {
                 it.file.name.startsWith('openbeans-') ||
                         it.file.name.startsWith('asm-') ||
                         it.file.name.startsWith('antlr-') ||
-                        it.file.name.startsWith('antlr4-')
+                        it.file.name.startsWith('antlr4-') ||
+                        it.file.name.startsWith('picocli-')
             }
         }
         from('src/bin/groovy.icns')
@@ -382,7 +383,8 @@ ext.distSpec = copySpec {
                             it.file.name.startsWith('asm-') ||
                             it.file.name.startsWith('antlr-') ||
                             it.file.name.startsWith('antlr4-') ||
-                            it.file.name.startsWith('openbeans-')
+                            it.file.name.startsWith('openbeans-') ||
+                            it.file.name.startsWith('picocli-')
                 }
             }
         }

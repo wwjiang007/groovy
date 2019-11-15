@@ -32,6 +32,7 @@ import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.ConstructorCallExpression;
 import org.codehaus.groovy.ast.expr.DeclarationExpression;
 import org.codehaus.groovy.ast.expr.ElvisOperatorExpression;
+import org.codehaus.groovy.ast.expr.EmptyExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.FieldExpression;
 import org.codehaus.groovy.ast.expr.GStringExpression;
@@ -41,6 +42,7 @@ import org.codehaus.groovy.ast.expr.MapEntryExpression;
 import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.expr.MethodPointerExpression;
+import org.codehaus.groovy.ast.expr.MethodReferenceExpression;
 import org.codehaus.groovy.ast.expr.NotExpression;
 import org.codehaus.groovy.ast.expr.PostfixExpression;
 import org.codehaus.groovy.ast.expr.PrefixExpression;
@@ -61,6 +63,7 @@ import org.codehaus.groovy.ast.stmt.CaseStatement;
 import org.codehaus.groovy.ast.stmt.CatchStatement;
 import org.codehaus.groovy.ast.stmt.ContinueStatement;
 import org.codehaus.groovy.ast.stmt.DoWhileStatement;
+import org.codehaus.groovy.ast.stmt.EmptyStatement;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.ast.stmt.ForStatement;
 import org.codehaus.groovy.ast.stmt.IfStatement;
@@ -75,26 +78,22 @@ import org.codehaus.groovy.classgen.BytecodeExpression;
 import java.util.List;
 
 /**
- * An implementation of the visitor pattern for working with ASTNodes
- *
- * @author <a href="mailto:james@coredevelopers.net">James Strachan</a>
+ * An implementation of the visitor pattern for working with ASTNodes.
  */
-
 public interface GroovyCodeVisitor {
 
+    //--------------------------------------------------------------------------
     // statements
-
-    //-------------------------------------------------------------------------
 
     void visitBlockStatement(BlockStatement statement);
 
-    void visitForLoop(ForStatement forLoop);
+    void visitForLoop(ForStatement statement);
 
-    void visitWhileLoop(WhileStatement loop);
+    void visitWhileLoop(WhileStatement statement);
 
-    void visitDoWhileLoop(DoWhileStatement loop);
+    void visitDoWhileLoop(DoWhileStatement statement);
 
-    void visitIfElse(IfStatement ifElse);
+    void visitIfElse(IfStatement statement);
 
     void visitExpressionStatement(ExpressionStatement statement);
 
@@ -102,7 +101,7 @@ public interface GroovyCodeVisitor {
 
     void visitAssertStatement(AssertStatement statement);
 
-    void visitTryCatchFinally(TryCatchStatement finally1);
+    void visitTryCatchFinally(TryCatchStatement statement);
 
     void visitSwitch(SwitchStatement statement);
 
@@ -115,21 +114,22 @@ public interface GroovyCodeVisitor {
     void visitThrowStatement(ThrowStatement statement);
 
     void visitSynchronizedStatement(SynchronizedStatement statement);
-    
+
     void visitCatchStatement(CatchStatement statement);
 
+    default void visitEmptyStatement(EmptyStatement statement) {}
+
+    //--------------------------------------------------------------------------
     // expressions
 
-    //-------------------------------------------------------------------------
-
-    void visitMethodCallExpression(MethodCallExpression call);
+    void visitMethodCallExpression(MethodCallExpression expression);
 
     void visitStaticMethodCallExpression(StaticMethodCallExpression expression);
 
     void visitConstructorCallExpression(ConstructorCallExpression expression);
 
     void visitTernaryExpression(TernaryExpression expression);
-    
+
     void visitShortTernaryExpression(ElvisOperatorExpression expression);
 
     void visitBinaryExpression(BinaryExpression expression);
@@ -142,9 +142,7 @@ public interface GroovyCodeVisitor {
 
     void visitClosureExpression(ClosureExpression expression);
 
-    default void visitLambdaExpression(LambdaExpression expression) {
-        visitClosureExpression(expression);
-    }
+    void visitLambdaExpression(LambdaExpression expression);
 
     void visitTupleExpression(TupleExpression expression);
 
@@ -158,11 +156,13 @@ public interface GroovyCodeVisitor {
 
     void visitPropertyExpression(PropertyExpression expression);
 
-    void visitAttributeExpression(AttributeExpression attributeExpression);
+    void visitAttributeExpression(AttributeExpression expression);
 
     void visitFieldExpression(FieldExpression expression);
 
     void visitMethodPointerExpression(MethodPointerExpression expression);
+
+    void visitMethodReferenceExpression(MethodReferenceExpression expression);
 
     void visitConstantExpression(ConstantExpression expression);
 
@@ -192,20 +192,13 @@ public interface GroovyCodeVisitor {
 
     void visitArgumentlistExpression(ArgumentListExpression expression);
 
-    void visitClosureListExpression(ClosureListExpression closureListExpression);
+    void visitClosureListExpression(ClosureListExpression expression);
 
     void visitBytecodeExpression(BytecodeExpression expression);
 
+    default void visitEmptyExpression(EmptyExpression expression) {}
+
     default void visitListOfExpressions(List<? extends Expression> list) {
-        if (list == null) return;
-        for (Expression expression : list) {
-            if (expression instanceof SpreadExpression) {
-                Expression spread = ((SpreadExpression) expression).getExpression();
-                spread.visit(this);
-            } else {
-                expression.visit(this);
-            }
-        }
+        if (list != null) list.forEach(expr -> expr.visit(this));
     }
 }
-

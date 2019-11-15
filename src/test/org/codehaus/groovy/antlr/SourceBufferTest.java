@@ -18,14 +18,11 @@
  */
 package org.codehaus.groovy.antlr;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 
 import java.io.Reader;
 import java.io.StringReader;
 
-/**
- * @author <a href="mailto:groovy@ross-rayner.com">Jeremy Rayner</a>
- */
 public class SourceBufferTest extends GroovyTestCase {
 
     public void testEmptyBuffer() throws Exception {

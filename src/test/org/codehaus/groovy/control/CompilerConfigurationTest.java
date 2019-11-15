@@ -18,7 +18,7 @@
  */
 package org.codehaus.groovy.control;
 
-import groovy.util.GroovyTestCase;
+import groovy.test.GroovyTestCase;
 import org.codehaus.groovy.control.messages.WarningMessage;
 
 import java.io.File;
@@ -65,7 +65,7 @@ public class CompilerConfigurationTest extends GroovyTestCase {
         }
         assertNull(config.getTargetDirectory());
         assertEquals(".groovy", config.getDefaultScriptExtension());
-        assertNull(config.getJointCompilationOptions());
+        assertTrue(0 == config.getJointCompilationOptions().size());
         assertNotNull(config.getPluginFactory());
     }
 
@@ -102,7 +102,7 @@ public class CompilerConfigurationTest extends GroovyTestCase {
         }
         assertNull(config.getTargetDirectory());
         assertEquals(".groovy", config.getDefaultScriptExtension());
-        assertNull(config.getJointCompilationOptions());
+        assertTrue(0 == config.getJointCompilationOptions().size());
         assertNotNull(config.getPluginFactory());
     }
 
@@ -129,7 +129,7 @@ public class CompilerConfigurationTest extends GroovyTestCase {
         initJoint.put("somekey", "somevalue");
         init.setJointCompilationOptions(initJoint);
 
-        final ParserPluginFactory initPPF = ParserPluginFactory.newInstance();
+        final ParserPluginFactory initPPF = ParserPluginFactory.antlr4(init);
         init.setPluginFactory(initPPF);
 
         assertEquals(WarningMessage.POSSIBLE_ERRORS, init.getWarningLevel());

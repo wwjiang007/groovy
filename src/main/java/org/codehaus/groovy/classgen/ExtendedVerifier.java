@@ -18,7 +18,6 @@
  */
 package org.codehaus.groovy.classgen;
 
-import org.codehaus.groovy.ast.ASTNode;
 import org.codehaus.groovy.ast.AnnotatedNode;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassCodeVisitorSupport;
@@ -26,7 +25,6 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ConstructorNode;
 import org.codehaus.groovy.ast.FieldNode;
-import org.codehaus.groovy.ast.GenericsType;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.PackageNode;
 import org.codehaus.groovy.ast.Parameter;
@@ -43,20 +41,22 @@ import org.codehaus.groovy.control.AnnotationConstantsVisitor;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.syntax.SyntaxException;
 import org.objectweb.asm.Opcodes;
 
+import java.lang.annotation.Retention;
+import java.lang.annotation.RetentionPolicy;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.HashMap;
+import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.stream.Collectors;
 
 import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpec;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecRecurse;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.createGenericsSpec;
+import static org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport.evaluateExpression;
 
 /**
  * A specialized Groovy AST visitor meant to perform additional verifications upon the
@@ -75,6 +75,12 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
         this.source = sourceUnit;
     }
 
+    @Override
+    protected SourceUnit getSourceUnit() {
+        return this.source;
+    }
+
+    @Override
     public void visitClass(ClassNode node) {
         AnnotationConstantsVisitor acv = new AnnotationConstantsVisitor();
         acv.visitClass(node, this.source);
@@ -91,6 +97,7 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
         node.visitContents(this);
     }
 
+    @Override
     public void visitField(FieldNode node) {
         visitAnnotations(node, AnnotationNode.FIELD_TARGET);
     }
@@ -100,25 +107,26 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
         visitAnnotations(expression, AnnotationNode.LOCAL_VARIABLE_TARGET);
     }
 
+    @Override
     public void visitConstructor(ConstructorNode node) {
         visitConstructorOrMethod(node, AnnotationNode.CONSTRUCTOR_TARGET);
     }
 
+    @Override
     public void visitMethod(MethodNode node) {
         visitConstructorOrMethod(node, AnnotationNode.METHOD_TARGET);
     }
 
     private void visitConstructorOrMethod(MethodNode node, int methodTarget) {
         visitAnnotations(node, methodTarget);
-        for (int i = 0; i < node.getParameters().length; i++) {
-            Parameter parameter = node.getParameters()[i];
+        for (Parameter parameter : node.getParameters()) {
             visitAnnotations(parameter, AnnotationNode.PARAMETER_TARGET);
         }
 
         if (this.currentClass.isAnnotationDefinition() && !node.isStaticConstructor()) {
             ErrorCollector errorCollector = new ErrorCollector(this.source.getConfiguration());
             AnnotationVisitor visitor = new AnnotationVisitor(this.source, errorCollector);
-            visitor.setReportClass(currentClass);
+            visitor.setReportClass(this.currentClass);
             visitor.checkReturnType(node.getReturnType(), node);
             if (node.getParameters().length > 0) {
                 addError("Annotation members may not have parameters.", node.getParameters()[0]);
@@ -129,7 +137,7 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
             ReturnStatement code = (ReturnStatement) node.getCode();
             if (code != null) {
                 visitor.visitExpression(node.getName(), code.getExpression(), node.getReturnType());
-                visitor.checkCircularReference(currentClass, node.getReturnType(), code.getExpression());
+                visitor.checkCircularReference(this.currentClass, node.getReturnType(), code.getExpression());
             }
             this.source.getErrorCollector().addCollectorContents(errorCollector);
         }
@@ -137,9 +145,9 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
         if (code != null) {
             code.visit(this);
         }
-
     }
 
+    @Override
     public void visitProperty(PropertyNode node) {
     }
 
@@ -152,61 +160,74 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
             addError("Annotations are not supported in the current runtime. " + JVM_ERROR_MESSAGE, node);
             return;
         }
-        Map<String, List<AnnotationNode>> runtimeAnnotations = new LinkedHashMap<String, List<AnnotationNode>>();
+        Map<String, List<AnnotationNode>> nonSourceAnnotations = new LinkedHashMap<>();
         for (AnnotationNode unvisited : node.getAnnotations()) {
-            AnnotationNode visited = visitAnnotation(unvisited);
+            AnnotationNode visited;
+            {
+                ErrorCollector errorCollector = new ErrorCollector(source.getConfiguration());
+                AnnotationVisitor visitor = new AnnotationVisitor(source, errorCollector);
+                visited = visitor.visit(unvisited);
+                source.getErrorCollector().addCollectorContents(errorCollector);
+            }
+
             String name = visited.getClassNode().getName();
-            if (visited.hasRuntimeRetention()) {
-                List<AnnotationNode> seen = runtimeAnnotations.get(name);
+            if (!visited.hasSourceRetention()) {
+                List<AnnotationNode> seen = nonSourceAnnotations.get(name);
                 if (seen == null) {
-                    seen = new ArrayList<AnnotationNode>();
+                    seen = new ArrayList<>();
                 }
                 seen.add(visited);
-                runtimeAnnotations.put(name, seen);
+                nonSourceAnnotations.put(name, seen);
             }
-            boolean isTargetAnnotation = name.equals("java.lang.annotation.Target");
 
             // Check if the annotation target is correct, unless it's the target annotating an annotation definition
             // defining on which target elements the annotation applies
+            boolean isTargetAnnotation = name.equals("java.lang.annotation.Target");
             if (!isTargetAnnotation && !visited.isTargetAllowed(target)) {
-                addError("Annotation @" + name + " is not allowed on element "
-                        + AnnotationNode.targetToName(target), visited);
+                addError("Annotation @" + name + " is not allowed on element " + AnnotationNode.targetToName(target), visited);
             }
             visitDeprecation(node, visited);
             visitOverride(node, visited);
         }
-        checkForDuplicateAnnotations(node, runtimeAnnotations);
+        checkForDuplicateAnnotations(node, nonSourceAnnotations);
     }
 
-    private void checkForDuplicateAnnotations(AnnotatedNode node, Map<String, List<AnnotationNode>> runtimeAnnotations) {
-        for (Map.Entry<String, List<AnnotationNode>> next : runtimeAnnotations.entrySet()) {
+    private void checkForDuplicateAnnotations(AnnotatedNode node, Map<String, List<AnnotationNode>> nonSourceAnnotations) {
+        for (Map.Entry<String, List<AnnotationNode>> next : nonSourceAnnotations.entrySet()) {
             if (next.getValue().size() > 1) {
                 ClassNode repeatable = null;
                 AnnotationNode repeatee = next.getValue().get(0);
-                List<AnnotationNode> repeateeAnnotations = repeatee.getClassNode().getAnnotations();
-                for (AnnotationNode anno : repeateeAnnotations) {
-                    ClassNode annoClassNode = anno.getClassNode();
-                    if (annoClassNode.getName().equals("java.lang.annotation.Repeatable")) {
+                for (AnnotationNode anno : repeatee.getClassNode().getAnnotations()) {
+                    if (anno.getClassNode().getName().equals("java.lang.annotation.Repeatable")) {
                         Expression value = anno.getMember("value");
-                        if (value instanceof ClassExpression) {
-                            ClassExpression ce = (ClassExpression) value;
-                            if (ce.getType() != null && ce.getType().isAnnotationDefinition()) {
-                                repeatable = ce.getType();
-                                break;
-                            }
+                        if (value instanceof ClassExpression && value.getType().isAnnotationDefinition()) {
+                            repeatable = value.getType();
+                            break;
                         }
                     }
                 }
                 if (repeatable != null) {
                     AnnotationNode collector = new AnnotationNode(repeatable);
-                    collector.setRuntimeRetention(true); // checked earlier
-                    List<Expression> annos = new ArrayList<Expression>();
-                    for (AnnotationNode an : next.getValue()) {
-                        annos.add(new AnnotationConstantExpression(an));
+                    if (repeatee.hasRuntimeRetention()) {
+                        collector.setRuntimeRetention(true);
+                    } else if (repeatable.isResolved()) {
+                        Class<?> repeatableType = repeatable.getTypeClass();
+                        Retention retention = repeatableType.getAnnotation(Retention.class);
+                        collector.setRuntimeRetention(retention != null && retention.value().equals(RetentionPolicy.RUNTIME));
+                    } else {
+                        for (AnnotationNode annotation : repeatable.getAnnotations()) {
+                            if (annotation.getClassNode().getName().equals("java.lang.annotation.Retention")) {
+                                Expression value = annotation.getMember("value"); assert value != null;
+                                Object retention = evaluateExpression(value, source.getConfiguration());
+                                collector.setRuntimeRetention(retention != null && retention.toString().equals("RUNTIME"));
+                                break;
+                            }
+                        }
                     }
-                    collector.addMember("value", new ListExpression(annos));
-                    node.addAnnotation(collector);
+                    collector.addMember("value", new ListExpression(next.getValue().stream()
+                        .map(AnnotationConstantExpression::new).collect(Collectors.toList())));
                     node.getAnnotations().removeAll(next.getValue());
+                    node.addAnnotation(collector);
                 }
             }
         }
@@ -229,8 +250,8 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
 
     // TODO GROOVY-5011 handle case of @Override on a property
     private void visitOverride(AnnotatedNode node, AnnotationNode visited) {
-        ClassNode annotationClassNode = visited.getClassNode();
-        if (annotationClassNode.isResolved() && annotationClassNode.getName().equals("java.lang.Override")) {
+        ClassNode annotationType = visited.getClassNode();
+        if (annotationType.isResolved() && annotationType.getName().equals("java.lang.Override")) {
             if (node instanceof MethodNode && !Boolean.TRUE.equals(node.getNodeMetaData(Verifier.DEFAULT_PARAMETER_GENERATED))) {
                 boolean override = false;
                 MethodNode origMethod = (MethodNode) node;
@@ -260,28 +281,27 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
         ClassNode next = cNode;
         outer:
         while (next != null) {
-            Map genericsSpec = createGenericsSpec(next);
+            Map<String, ClassNode> genericsSpec = createGenericsSpec(next);
             MethodNode mn = correctToGenericsSpec(genericsSpec, method);
             if (next != cNode) {
                 ClassNode correctedNext = correctToGenericsSpecRecurse(genericsSpec, next);
                 MethodNode found = getDeclaredMethodCorrected(genericsSpec, mn, correctedNext);
                 if (found != null) break;
             }
-            List<ClassNode> ifaces = new ArrayList<ClassNode>(Arrays.asList(next.getInterfaces()));
-            Map updatedGenericsSpec = new HashMap(genericsSpec);
+            List<ClassNode> ifaces = new ArrayList<>(Arrays.asList(next.getInterfaces()));
             while (!ifaces.isEmpty()) {
                 ClassNode origInterface = ifaces.remove(0);
                 if (!origInterface.equals(ClassHelper.OBJECT_TYPE)) {
-                    updatedGenericsSpec = createGenericsSpec(origInterface, updatedGenericsSpec);
-                    ClassNode iNode = correctToGenericsSpecRecurse(updatedGenericsSpec, origInterface);
-                    MethodNode found2 = getDeclaredMethodCorrected(updatedGenericsSpec, mn, iNode);
+                    genericsSpec = createGenericsSpec(origInterface, genericsSpec);
+                    ClassNode iNode = correctToGenericsSpecRecurse(genericsSpec, origInterface);
+                    MethodNode found2 = getDeclaredMethodCorrected(genericsSpec, mn, iNode);
                     if (found2 != null) break outer;
-                    ifaces.addAll(Arrays.asList(iNode.getInterfaces()));
+                    Collections.addAll(ifaces, iNode.getInterfaces());
                 }
             }
             ClassNode superClass = next.getUnresolvedSuperClass();
             if (superClass != null) {
-                next =  correctToGenericsSpecRecurse(updatedGenericsSpec, superClass);
+                next = correctToGenericsSpecRecurse(genericsSpec, superClass);
             } else {
                 next = null;
             }
@@ -290,27 +310,13 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
     }
 
     private static MethodNode getDeclaredMethodCorrected(Map genericsSpec, MethodNode mn, ClassNode correctedNext) {
-        for (MethodNode orig :  correctedNext.getDeclaredMethods(mn.getName())) {
-            MethodNode method = correctToGenericsSpec(genericsSpec, orig);
-            if (ParameterUtils.parametersEqual(method.getParameters(), mn.getParameters())) {
-                return method;
+        for (MethodNode declared : correctedNext.getDeclaredMethods(mn.getName())) {
+            MethodNode corrected = correctToGenericsSpec(genericsSpec, declared);
+            if (ParameterUtils.parametersEqual(corrected.getParameters(), mn.getParameters())) {
+                return corrected;
             }
         }
         return null;
-    }
-
-    /**
-     * Resolve metadata and details of the annotation.
-     *
-     * @param unvisited the node to visit
-     * @return the visited node
-     */
-    private AnnotationNode visitAnnotation(AnnotationNode unvisited) {
-        ErrorCollector errorCollector = new ErrorCollector(this.source.getConfiguration());
-        AnnotationVisitor visitor = new AnnotationVisitor(this.source, errorCollector);
-        AnnotationNode visited = visitor.visit(unvisited);
-        this.source.getErrorCollector().addCollectorContents(errorCollector);
-        return visited;
     }
 
     /**
@@ -320,22 +326,5 @@ public class ExtendedVerifier extends ClassCodeVisitorSupport {
      */
     protected boolean isAnnotationCompatible() {
         return CompilerConfiguration.isPostJDK5(this.source.getConfiguration().getTargetBytecode());
-    }
-
-    public void addError(String msg, ASTNode expr) {
-        this.source.getErrorCollector().addErrorAndContinue(
-                new SyntaxErrorMessage(
-                        new SyntaxException(msg + '\n', expr.getLineNumber(), expr.getColumnNumber(), expr.getLastLineNumber(), expr.getLastColumnNumber()), this.source)
-        );
-    }
-
-    @Override
-    protected SourceUnit getSourceUnit() {
-        return source;
-    }
-
-    // TODO use it or lose it
-    public void visitGenericType(GenericsType genericsType) {
-
     }
 }

@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.transform
 
+import groovy.test.GroovyShellTestCase
 import groovy.transform.AutoClone
 import groovy.transform.AutoExternalize
 import groovy.transform.CompileStatic
@@ -783,6 +784,22 @@ class CanonicalComponentsTransformTest extends GroovyShellTestCase {
                 String getField() { null }
             }
             assert new FieldAndPropertyIncludedInHashCode().hashCode() == 442087
+        '''
+    }
+
+    // GROOVY-9009
+    void testAutoCloneToStringCompileStatic() {
+        new GroovyShell().evaluate '''
+            import groovy.transform.*
+
+            @ToString
+            @CompileStatic
+            @AutoClone
+            class SomeClass {
+                String someId
+            }
+
+            assert new SomeClass(someId: 'myid').clone().toString() == 'SomeClass(myid)'
         '''
     }
 }

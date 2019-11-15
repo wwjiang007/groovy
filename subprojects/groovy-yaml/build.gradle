@@ -18,14 +18,19 @@
  */
 
 ext {
-    jacksondataformatyamlVersion = '2.9.7'
-    jacksondatabindVersion = '2.9.7'
+    jacksonVersion = '2.10.0'
 }
 
 dependencies {
-    compile rootProject
-    compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksondataformatyamlVersion"
-    compile "com.fasterxml.jackson.core:jackson-databind:$jacksondatabindVersion"
-    compile project(':groovy-json')
-    testCompile project(':groovy-test')
+    implementation rootProject
+    compile "com.fasterxml.jackson.dataformat:jackson-dataformat-yaml:$jacksonVersion"
+    compile "com.fasterxml.jackson.core:jackson-databind:$jacksonVersion"
+    testRuntime "com.fasterxml.jackson.core:jackson-annotations:$jacksonVersion"
+    implementation project(':groovy-json')
+    testImplementation project(':groovy-test')
+    testRuntime project(':groovy-ant') // for JavadocAssertionTests
+}
+
+eclipse.classpath.file.whenMerged {
+    entries.removeAll { entry -> entry.path in ['/groovy-ant', '/groovy-groovydoc'] }
 }

@@ -25,7 +25,6 @@ import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
-import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.PropertyNode;
 import org.codehaus.groovy.ast.expr.ConstantExpression;
@@ -41,7 +40,6 @@ import org.codehaus.groovy.runtime.InvokerHelper;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport;
 
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -182,7 +180,7 @@ public class ToStringASTTransformation extends AbstractASTTransformation {
         List<ToStringElement> elements = new ArrayList<ToStringElement>();
 
         // def $toStringFirst = true
-        final VariableExpression first = varX("$toStringFirst");
+        final VariableExpression first = localVarX("$toStringFirst");
         body.addStatement(declS(first, constX(Boolean.TRUE)));
 
         // <class_name>(
@@ -219,12 +217,8 @@ public class ToStringASTTransformation extends AbstractASTTransformation {
         }
 
         if (includes != null) {
-            Comparator<ToStringElement> includeComparator = new Comparator<ToStringElement>() {
-                public int compare(ToStringElement tse1, ToStringElement tse2) {
-                    return Integer.compare(includes.indexOf(tse1.name), includes.indexOf(tse2.name));
-                }
-            };
-            Collections.sort(elements, includeComparator);
+            Comparator<ToStringElement> includeComparator = Comparator.comparingInt(tse -> includes.indexOf(tse.name));
+            elements.sort(includeComparator);
         }
 
         for (ToStringElement el : elements) {
