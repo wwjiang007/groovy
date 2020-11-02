@@ -27,6 +27,7 @@ public class ConstructorMetaClassSite extends MetaClassSite {
         super(site, metaClass);
     }
 
+    @Override
     public Object callConstructor(Object receiver, Object[] args) throws Throwable {
         if (receiver == metaClass.getTheClass()) {
             try {
@@ -35,7 +36,7 @@ public class ConstructorMetaClassSite extends MetaClassSite {
                 throw ScriptBytecodeAdapter.unwrap(gre);
             }
         } else {
-          return CallSiteArray.defaultCallConstructor(this, (Class)receiver, args);
+          return CallSiteArray.defaultCallConstructor(this, receiver, args);
         }
     }
 }

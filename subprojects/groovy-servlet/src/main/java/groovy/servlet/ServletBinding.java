@@ -104,6 +104,7 @@ public class ServletBinding extends Binding {
          * Will always throw a GroovyBugError
          * @see java.io.OutputStream#write(int)
          */
+        @Override
         public void write(int b) {
             throw new GroovyBugError("Any write calls to this stream are invalid!");
         }
@@ -131,18 +132,23 @@ public class ServletBinding extends Binding {
         }
         public ServletOutputStream getOutputStream() {
             return new ServletOutputStream() {
+                @Override
                 public void write(int b) throws IOException {
                     getResponseStream().write(b);                    
                 }
+                @Override
                 public void close() throws IOException {
                     getResponseStream().close();
                 }
+                @Override
                 public void flush() throws IOException {
                     getResponseStream().flush();
                 }
+                @Override
                 public void write(byte[] b) throws IOException {
                     getResponseStream().write(b);
                 }
+                @Override
                 public void write(byte[] b, int off, int len) throws IOException {
                     getResponseStream().write(b, off, len);
                 }
@@ -162,35 +168,45 @@ public class ServletBinding extends Binding {
         }
         public PrintWriter getWriter() {
             return new PrintWriter(new InvalidOutputStream()) {
+                @Override
                 public boolean checkError() {
                     return getResponseWriter().checkError();
                 }
+                @Override
                 public void close() {
                     getResponseWriter().close();
                 }
+                @Override
                 public void flush() {
                     getResponseWriter().flush();
                 }
+                @Override
                 public void write(char[] buf) {
                     getResponseWriter().write(buf);
                 }
+                @Override
                 public void write(char[] buf, int off, int len) {
                     getResponseWriter().write(buf, off, len);
                 }
+                @Override
                 public void write(int c) {
                     getResponseWriter().write(c);
                 }
+                @Override
                 public void write(String s, int off, int len) {
                     getResponseWriter().write(s, off, len);
                 }
+                @Override
                 public void println() {
                     getResponseWriter().println();
                 }
+                @Override
                 public PrintWriter format(String format, Object... args) {
                     getResponseWriter().format(format, args);
                     return this;
                 }
-                public PrintWriter format(Locale l, String format,  Object... args) {
+                @Override
+                public PrintWriter format(Locale l, String format, Object... args) {
                     getResponseWriter().format(l, format, args);
                     return this;
                 }
@@ -303,8 +319,9 @@ public class ServletBinding extends Binding {
         super.setVariable("html", builder);
 
         try {
+            // load using reflection to avoid needing a hard requirement on groovy-json for those not needing JSON support
             Class jsonBuilderClass = this.getClass().getClassLoader().loadClass("groovy.json.StreamingJsonBuilder");
-            Constructor writerConstructor = jsonBuilderClass.getConstructor(Writer.class);
+            Constructor writerConstructor = getWriterConstructor(jsonBuilderClass);
             super.setVariable("json", writerConstructor.newInstance(output.getWriter()));
         } catch (Throwable t) {
             t.printStackTrace();
@@ -321,6 +338,11 @@ public class ServletBinding extends Binding {
         // bind redirect method
         c = new MethodClosure(this, "redirect");
         super.setVariable("redirect", c);
+    }
+
+    @SuppressWarnings("unchecked")
+    private Constructor getWriterConstructor(Class jsonBuilderClass) throws NoSuchMethodException {
+        return jsonBuilderClass.getConstructor(Writer.class);
     }
 
     private static void validateArgs(String name, String message) {

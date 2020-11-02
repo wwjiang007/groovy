@@ -18,7 +18,7 @@
  */
 package org.apache.groovy.ast.tools;
 
-import groovy.transform.Generated;
+import org.apache.groovy.util.BeanUtils;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.ConstructorNode;
@@ -34,15 +34,19 @@ import org.codehaus.groovy.ast.stmt.Statement;
 import org.codehaus.groovy.transform.AbstractASTTransformation;
 
 import java.lang.reflect.Modifier;
+import java.util.ArrayDeque;
 import java.util.Arrays;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Objects;
+import java.util.Queue;
 import java.util.Set;
+import java.util.function.Predicate;
 
-import static org.apache.groovy.ast.tools.AnnotatedNodeUtils.hasAnnotation;
+import static org.apache.groovy.ast.tools.AnnotatedNodeUtils.isGenerated;
 import static org.apache.groovy.ast.tools.AnnotatedNodeUtils.markAsGenerated;
 import static org.codehaus.groovy.ast.ClassHelper.boolean_TYPE;
 import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
@@ -51,7 +55,8 @@ import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
  * Utility class for working with ClassNodes
  */
 public class ClassNodeUtils {
-    private static final ClassNode GENERATED_TYPE = ClassHelper.make(Generated.class);
+
+    private ClassNodeUtils() { }
 
     /**
      * Formats a type name into a human readable version. For arrays, appends "[]" to the formatted
@@ -60,7 +65,7 @@ public class ClassNodeUtils {
      * @param cNode the type to format
      * @return a human readable version of the type name (java.lang.String[] for example)
      */
-    public static String formatTypeName(ClassNode cNode) {
+    public static String formatTypeName(final ClassNode cNode) {
         if (cNode.isArray()) {
             ClassNode it = cNode;
             int dim = 0;
@@ -83,12 +88,12 @@ public class ClassNodeUtils {
      *
      * @see ClassNode#addMethod(String, int, ClassNode, Parameter[], ClassNode[], Statement)
      */
-    public static MethodNode addGeneratedMethod(ClassNode cNode, String name,
-                                int modifiers,
-                                ClassNode returnType,
-                                Parameter[] parameters,
-                                ClassNode[] exceptions,
-                                Statement code) {
+    public static MethodNode addGeneratedMethod(final ClassNode cNode, final String name,
+                                final int modifiers,
+                                final ClassNode returnType,
+                                final Parameter[] parameters,
+                                final ClassNode[] exceptions,
+                                final Statement code) {
         MethodNode existing = cNode.getDeclaredMethod(name, parameters);
         if (existing != null) return existing;
         MethodNode result = new MethodNode(name, modifiers, returnType, parameters, exceptions, code);
@@ -101,7 +106,7 @@ public class ClassNodeUtils {
      *
      * @see ClassNode#addMethod(MethodNode)
      */
-    public static void addGeneratedMethod(ClassNode cNode, MethodNode mNode) {
+    public static void addGeneratedMethod(final ClassNode cNode, final MethodNode mNode) {
         cNode.addMethod(mNode);
         markAsGenerated(cNode, mNode);
     }
@@ -111,7 +116,7 @@ public class ClassNodeUtils {
      *
      * @see org.codehaus.groovy.ast.ModuleNode#addClass(ClassNode)
      */
-    public static void addGeneratedInnerClass(ClassNode cNode, ClassNode inner) {
+    public static void addGeneratedInnerClass(final ClassNode cNode, final ClassNode inner) {
         cNode.getModule().addClass(inner);
         markAsGenerated(cNode, inner);
     }
@@ -121,7 +126,7 @@ public class ClassNodeUtils {
      *
      * @see ClassNode#addConstructor(int, Parameter[], ClassNode[], Statement)
      */
-    public static ConstructorNode addGeneratedConstructor(ClassNode classNode, int modifiers, Parameter[] parameters, ClassNode[] exceptions, Statement code) {
+    public static ConstructorNode addGeneratedConstructor(final ClassNode classNode, final int modifiers, final Parameter[] parameters, final ClassNode[] exceptions, final Statement code) {
         ConstructorNode consNode = classNode.addConstructor(modifiers, parameters, exceptions, code);
         markAsGenerated(classNode, consNode);
         return consNode;
@@ -132,7 +137,7 @@ public class ClassNodeUtils {
      *
      * @see ClassNode#addConstructor(ConstructorNode)
      */
-    public static void addGeneratedConstructor(ClassNode classNode, ConstructorNode consNode) {
+    public static void addGeneratedConstructor(final ClassNode classNode, final ConstructorNode consNode) {
         classNode.addConstructor(consNode);
         markAsGenerated(classNode, consNode);
     }
@@ -143,10 +148,10 @@ public class ClassNodeUtils {
      * @param cNode The ClassNode
      * @return A map of methods
      */
-    public static Map<String, MethodNode> getDeclaredMethodsFromSuper(ClassNode cNode) {
+    public static Map<String, MethodNode> getDeclaredMethodsFromSuper(final ClassNode cNode) {
         ClassNode parent = cNode.getSuperClass();
         if (parent == null) {
-            return new HashMap<String, MethodNode>();
+            return new HashMap<>();
         }
         return parent.getDeclaredMethodsMap();
     }
@@ -159,7 +164,7 @@ public class ClassNodeUtils {
      * @param cNode The ClassNode
      * @param methodsMap A map of existing methods to alter
      */
-    public static void addDeclaredMethodsFromInterfaces(ClassNode cNode, Map<String, MethodNode> methodsMap) {
+    public static void addDeclaredMethodsFromInterfaces(final ClassNode cNode, final Map<String, MethodNode> methodsMap) {
         for (ClassNode iface : cNode.getInterfaces()) {
             Map<String, MethodNode> declaredMethods = iface.getDeclaredMethodsMap();
             for (Map.Entry<String, MethodNode> entry : declaredMethods.entrySet()) {
@@ -177,7 +182,7 @@ public class ClassNodeUtils {
      * @param cNode The ClassNode
      * @return A map of methods
      */
-    public static Map<String, MethodNode> getDeclaredMethodsFromInterfaces(ClassNode cNode) {
+    public static Map<String, MethodNode> getDeclaredMethodsFromInterfaces(final ClassNode cNode) {
         Map<String, MethodNode> methodsMap = new HashMap<>();
         addDeclaredMethodsFromInterfaces(cNode, methodsMap);
         return methodsMap;
@@ -190,8 +195,8 @@ public class ClassNodeUtils {
      * @param cNode The ClassNode
      * @param methodsMap A map of existing methods to alter
      */
-    public static void addDeclaredMethodsFromAllInterfaces(ClassNode cNode, Map<String, MethodNode> methodsMap) {
-        List cnInterfaces = Arrays.asList(cNode.getInterfaces());
+    public static void addDeclaredMethodsFromAllInterfaces(final ClassNode cNode, final Map<String, MethodNode> methodsMap) {
+        List<?> cnInterfaces = Arrays.asList(cNode.getInterfaces());
         ClassNode parent = cNode.getSuperClass();
         while (parent != null && !parent.equals(ClassHelper.OBJECT_TYPE)) {
             ClassNode[] interfaces = parent.getInterfaces();
@@ -214,7 +219,7 @@ public class ClassNodeUtils {
      * @param trySpread whether to try to account for SpreadExpressions within the arguments
      * @return true if a matching method was found
      */
-    public static boolean hasPossibleStaticMethod(ClassNode cNode, String name, Expression arguments, boolean trySpread) {
+    public static boolean hasPossibleStaticMethod(final ClassNode cNode, final String name, final Expression arguments, final boolean trySpread) {
         int count = 0;
         boolean foundSpread = false;
 
@@ -266,7 +271,7 @@ public class ClassNodeUtils {
     /**
      * Return true if we have a static accessor
      */
-    public static boolean hasPossibleStaticProperty(ClassNode cNode, String methodName) {
+    public static boolean hasPossibleStaticProperty(final ClassNode cNode, final String methodName) {
         // assume explicit static method call checked first so we can assume a simple check here
         if (!methodName.startsWith("get") && !methodName.startsWith("is")) {
             return false;
@@ -283,7 +288,7 @@ public class ClassNodeUtils {
      * @param accessorName the accessor name of interest, e.g. getAge
      * @return the property name, e.g. age, or original if not a valid property accessor name
      */
-    public static String getPropNameForAccessor(String accessorName) {
+    public static String getPropNameForAccessor(final String accessorName) {
         if (!isValidAccessorName(accessorName)) return accessorName;
         int prefixLength = accessorName.startsWith("is") ? 2 : 3;
         return String.valueOf(accessorName.charAt(prefixLength)).toLowerCase() + accessorName.substring(prefixLength + 1);
@@ -295,7 +300,7 @@ public class ClassNodeUtils {
      * @param accessorName the accessor name of interest, e.g. getAge
      * @return true if a valid prefix is found
      */
-    public static boolean isValidAccessorName(String accessorName) {
+    public static boolean isValidAccessorName(final String accessorName) {
         if (accessorName.startsWith("get") || accessorName.startsWith("is") || accessorName.startsWith("set")) {
             int prefixLength = accessorName.startsWith("is") ? 2 : 3;
             return accessorName.length() > prefixLength;
@@ -303,8 +308,12 @@ public class ClassNodeUtils {
         return false;
     }
 
-    public static boolean hasStaticProperty(ClassNode cNode, String propName) {
-        return getStaticProperty(cNode, propName) != null;
+    public static boolean hasStaticProperty(final ClassNode cNode, final String propName) {
+        PropertyNode found = getStaticProperty(cNode, propName);
+        if (found == null) {
+            found = getStaticProperty(cNode, BeanUtils.decapitalize(propName));
+        }
+        return found != null;
     }
 
     /**
@@ -315,7 +324,7 @@ public class ClassNodeUtils {
      * @param propName the property name
      * @return the static property if found or else null
      */
-    public static PropertyNode getStaticProperty(ClassNode cNode, String propName) {
+    public static PropertyNode getStaticProperty(final ClassNode cNode, final String propName) {
         ClassNode classNode = cNode;
         while (classNode != null) {
             for (PropertyNode pn : classNode.getProperties()) {
@@ -332,14 +341,11 @@ public class ClassNodeUtils {
      * @param cNode the ClassNode of interest
      * @return true if the given node is a (non-static) inner class, else false
      */
-    public static boolean isInnerClass(ClassNode cNode) {
-        return cNode.redirect().getOuterClass() != null
-                && !Modifier.isStatic(cNode.getModifiers());
+    public static boolean isInnerClass(final ClassNode cNode) {
+        return cNode.getOuterClass() != null && !Modifier.isStatic(cNode.getModifiers());
     }
 
-    private ClassNodeUtils() { }
-
-    public static boolean hasNoArgConstructor(ClassNode cNode) {
+    public static boolean hasNoArgConstructor(final ClassNode cNode) {
         List<ConstructorNode> constructors = cNode.getDeclaredConstructors();
         for (ConstructorNode next : constructors) {
             if (next.getParameters().length == 0) {
@@ -356,11 +362,11 @@ public class ClassNodeUtils {
      * @param cNode the type of the containing class
      * @return true if an explicit (non-generated) constructor was found
      */
-    public static boolean hasExplicitConstructor(AbstractASTTransformation xform, ClassNode cNode) {
+    public static boolean hasExplicitConstructor(final AbstractASTTransformation xform, final ClassNode cNode) {
         List<ConstructorNode> declaredConstructors = cNode.getDeclaredConstructors();
         for (ConstructorNode constructorNode : declaredConstructors) {
             // allow constructors added by other transforms if flagged as Generated
-            if (hasAnnotation(constructorNode, GENERATED_TYPE)) {
+            if (isGenerated(constructorNode)) {
                 continue;
             }
             if (xform != null) {
@@ -381,32 +387,37 @@ public class ClassNodeUtils {
      * @return true if both given nodes have the same package name
      * @throws NullPointerException if either of the given nodes are null
      */
-    public static boolean samePackageName(ClassNode first, ClassNode second) {
+    public static boolean samePackageName(final ClassNode first, final ClassNode second) {
         return Objects.equals(first.getPackageName(), second.getPackageName());
     }
 
     /**
-     * Return the (potentially inherited) field of the classnode.
-     *
-     * @param classNode the classnode
-     * @param fieldName the name of the field
-     * @return the field or null if not found
+     * Searches the class for a field that matches specified name.
      */
-    public static FieldNode getField(ClassNode classNode, String fieldName) {
-        ClassNode node = classNode;
-        Set<String> visited = new HashSet<String>();
-        while (node != null) {
-            FieldNode fn = node.getDeclaredField(fieldName);
-            if (fn != null) return fn;
-            ClassNode[] interfaces = node.getInterfaces();
-            for (ClassNode iNode : interfaces) {
-                if (visited.contains(iNode.getName())) continue;
-                FieldNode ifn = getField(iNode, fieldName);
-                visited.add(iNode.getName());
-                if (ifn != null) return ifn;
+    public static FieldNode getField(final ClassNode classNode, final String fieldName) {
+        return getField(classNode, fieldName, fieldNode -> true);
+    }
+
+    /**
+     * Searches the class for a field that matches specified name and test.
+     */
+    public static FieldNode getField(final ClassNode classNode, final String fieldName, final Predicate<FieldNode> acceptability) {
+        Queue<ClassNode> todo = new ArrayDeque<>(Collections.singletonList(classNode));
+        Set<ClassNode> done = new HashSet<>();
+        ClassNode next;
+
+        while ((next = todo.poll()) != null) {
+            if (done.add(next)) {
+                FieldNode fieldNode = next.getDeclaredField(fieldName);
+                if (fieldNode != null && acceptability.test(fieldNode))
+                    return fieldNode;
+
+                Collections.addAll(todo, next.getInterfaces());
+                ClassNode superType = next.getSuperClass();
+                if (superType != null) todo.add(superType);
             }
-            node = node.getSuperClass();
         }
+
         return null;
     }
 }

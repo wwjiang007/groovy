@@ -21,6 +21,7 @@ package org.codehaus.groovy.util;
 import java.util.Arrays;
 import java.util.NoSuchElementException;
 
+@Deprecated
 public class ComplexKeyHashMap
 {
   public static class Entry {
@@ -37,7 +38,7 @@ public class ComplexKeyHashMap
     }
   }
 
-  protected Entry table [];
+  protected Entry[] table;
 
   protected static final int DEFAULT_CAPACITY = 32;
   protected static final int MINIMUM_CAPACITY = 4;
@@ -149,10 +150,12 @@ public class ComplexKeyHashMap
                 index = i;
             }
 
+            @Override
             public boolean hasNext() {
                 return next != null;
             }
 
+            @Override
             public Entry next() {
                 return nextEntry();
             }

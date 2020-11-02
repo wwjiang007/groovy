@@ -351,7 +351,7 @@ public class DOMCategory {
     }
 
     public static Node replaceNode(NodesHolder self, Closure c) {
-        if (self.getLength() <= 0 || self.getLength() > 1) {
+        if (self.getLength() != 1) {
             throw new GroovyRuntimeException(
                     "replaceNode() can only be used to replace a single element, " +
                     "but was applied to " + self.getLength() + " elements."
@@ -542,6 +542,7 @@ public class DOMCategory {
             this.nodeLists = nodeLists;
         }
 
+        @Override
         public int getLength() {
             int length = 0;
             for (NodeList nl : nodeLists) {
@@ -550,6 +551,7 @@ public class DOMCategory {
             return length;
         }
 
+        @Override
         public Node item(int index) {
             int relativeIndex = index;
             for (NodeList nl : nodeLists) {
@@ -561,6 +563,7 @@ public class DOMCategory {
             return null;
         }
 
+        @Override
         public String toString() {
             return DOMCategory.toString(this);
         }
@@ -573,10 +576,12 @@ public class DOMCategory {
             this.nodes = nodes;
         }
 
+        @Override
         public int getLength() {
             return nodes.size();
         }
 
+        @Override
         public Node item(int index) {
             if (index < 0 || index >= getLength()) {
                 return null;

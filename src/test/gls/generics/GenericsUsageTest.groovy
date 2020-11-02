@@ -19,8 +19,6 @@
 package gls.generics
 
 import gls.CompilableTestSupport
-import org.codehaus.groovy.antlr.AntlrParserPluginFactory
-import org.codehaus.groovy.control.CompilerConfiguration
 import org.codehaus.groovy.control.MultipleCompilationErrorsException
 
 final class GenericsUsageTest extends CompilableTestSupport {
@@ -42,25 +40,43 @@ final class GenericsUsageTest extends CompilableTestSupport {
     }
 
     void testCovariantReturn() {
-        shouldNotCompile """
+        shouldNotCompile '''
+            class A<T> {
+                T foo(T t) { 1 }
+            }
+
+            class B extends A<Long> {
+                String foo(Long l) { '2' }
+            }
+        '''
+
+        // GROOVY-6977
+        assertScript '''
+            class A {
+              public <R> List<R> foo() {
+                List<R> list = new ArrayList<R>() {
+                    // ...
+                }
+                // ...
+                list
+              }
+            }
+
+            def longList = new A().<Long>foo()
+            assert longList != null
+            assert longList.empty
+        '''
+
+        assertScript '''
             class A<T> {
                 T foo(T t) {1}
             }
 
-            class B extends A<Long>{
-                String foo(Long l){"2"}
-            }
-        """
-
-        assertScript """
-            class A<T> {
-                T foo(T t) {1}
+            class B extends A<Long> {
+                Long foo(Long l) { 2 }
             }
 
-            class B extends A<Long>{
-                Long foo(Long l){2}
-            }
-            def b = new B();
+            def b = new B()
             try {
                 b.foo(new Object())
                 assert false
@@ -68,7 +84,7 @@ final class GenericsUsageTest extends CompilableTestSupport {
                 assert true
             }
             assert b.foo((Long) 1) == 2
-        """
+        '''
     }
 
     void testCovariantReturnWithInterface() {
@@ -124,7 +140,7 @@ final class GenericsUsageTest extends CompilableTestSupport {
     void testGenericsDiamondShortcutIllegalPosition() {
         shouldFailCompilationWithAnyMessage '''
             List<> list4 = []
-        ''', ['unexpected token: <', 'Unexpected input: \'<\'']
+        ''', ['unexpected token: <', 'Unexpected input: \'List<>\'']
     }
 
     void testGenericsInAsType() {
@@ -153,122 +169,46 @@ final class GenericsUsageTest extends CompilableTestSupport {
     }
 
     void testCompilationWithMissingClosingBracketsInGenerics() {
-        if (CompilerConfiguration.DEFAULT.pluginFactory instanceof AntlrParserPluginFactory) {
-            shouldFailCompilationWithDefaultMessage """
-                def list1 = new ArrayList<Integer()
-            """
+        shouldFailCompilationWithMessage """
+            def list1 = new ArrayList<Integer()
+        """, "Unexpected input: '('"
 
-            shouldFailCompilationWithDefaultMessage """
-                List<Integer list2 = new ArrayList<Integer>()
-            """
+        shouldFailCompilationWithMessage """
+            List<Integer list2 = new ArrayList<Integer>()
+        """, "Unexpected input: 'List<Integer'"
 
-            shouldFailCompilationWithDefaultMessage """
-                def c = []
-                for (Iterator<String i = c.iterator(); i.hasNext(); ) { }
-            """
+        shouldFailCompilationWithMessage """
+            def c = []
+            for (Iterator<String i = c.iterator(); i.hasNext(); ) { }
+        """, "Unexpected input: 'Iterator<String i'"
 
-            shouldFailCompilationWithDefaultMessage """
-                def m(Class<Integer someParam) {}
-            """
+        shouldFailCompilationWithMessage """
+            def m(Class<Integer someParam) {}
+        """, "Unexpected input: 'Class<Integer someParam'"
 
-            shouldFailCompilationWithDefaultMessage """
-                abstract class ArrayList1<E extends AbstractList<E> implements List<E> {}
-            """
+        shouldFailCompilationWithMessage """
+            abstract class ArrayList1<E extends AbstractList<E> implements List<E> {}
+        """, "Unexpected input: 'implements'"
 
-            shouldFailCompilationWithDefaultMessage """
-                abstract class ArrayList2<E> extends AbstractList<E implements List<E> {}
-            """
+        shouldFailCompilationWithMessage """
+            abstract class ArrayList2<E> extends AbstractList<E implements List<E> {}
+        """, "Unexpected input: '<'"
 
-            shouldFailCompilationWithDefaultMessage """
-                abstract class ArrayList3<E> extends AbstractList<E> implements List<E {}
-            """
+        shouldFailCompilationWithMessage """
+            abstract class ArrayList3<E> extends AbstractList<E> implements List<E {}
+        """, "Unexpected input: '<'"
 
-            shouldFailCompilationWithDefaultMessage """
-                def List<List<Integer> history = new ArrayList<List<Integer>>()
-            """
+        shouldFailCompilationWithMessage """
+            def List<List<Integer> history = new ArrayList<List<Integer>>()
+        """, "Unexpected input: 'def List<List<Integer> history'"
 
-            shouldFailCompilationWithDefaultMessage """
-                def List<List<Integer>> history = new ArrayList<List<Integer>()
-            """
-        } else {
-            shouldFailCompilationWithMessage """
-                def list1 = new ArrayList<Integer()
-            """, "Unexpected input: '('"
-
-            shouldFailCompilationWithMessage """
-                List<Integer list2 = new ArrayList<Integer>()
-            """, "Unexpected input: 'List<Integer'"
-
-            shouldFailCompilationWithMessage """
-                def c = []
-                for (Iterator<String i = c.iterator(); i.hasNext(); ) { }
-            """, "Unexpected input: 'Iterator<String i'"
-
-            shouldFailCompilationWithMessage """
-                def m(Class<Integer someParam) {}
-            """, "Unexpected input: 'Class<Integer someParam'"
-
-            shouldFailCompilationWithMessage """
-                abstract class ArrayList1<E extends AbstractList<E> implements List<E> {}
-            """, "Unexpected input: 'implements'"
-
-            shouldFailCompilationWithMessage """
-                abstract class ArrayList2<E> extends AbstractList<E implements List<E> {}
-            """, "Unexpected input: 'AbstractList<E implements'"
-
-            shouldFailCompilationWithMessage """
-                abstract class ArrayList3<E> extends AbstractList<E> implements List<E {}
-            """, "Unexpected input: '<'"
-
-            shouldFailCompilationWithMessage """
-                def List<List<Integer> history = new ArrayList<List<Integer>>()
-            """, "Unexpected input: 'def List<List<Integer> history'"
-
-            shouldFailCompilationWithMessage """
-                def List<List<Integer>> history = new ArrayList<List<Integer>()
-            """, "Unexpected input: '('"
-        }
-    }
-
-    private void shouldFailCompilationWithDefaultMessage(scriptText) {
-        shouldFailCompilationWithMessage scriptText, "Missing closing bracket '>' for generics types"
-    }
-
-    private void shouldFailCompilationWithMessage(scriptText, String errorMessage) {
-        shouldFailCompilationWithMessages(scriptText, [errorMessage])
-    }
-
-    private void shouldFailCompilationWithMessages(scriptText, List<String> errorMessages) {
-        try {
-            assertScript scriptText
-            fail("The script compilation should have failed as it contains generics errors, e.g. mis-matching generic brackets")
-        } catch (MultipleCompilationErrorsException mcee) {
-            def text = mcee.toString()
-            errorMessages.each {
-                assert text.contains(it)
-            }
-        }
-    }
-
-    private void shouldFailCompilationWithAnyMessage(scriptText, List<String> errorMessages) {
-        try {
-            assertScript scriptText
-            fail("The script compilation should have failed as it contains generics errors, e.g. mis-matching generic brackets")
-        } catch (MultipleCompilationErrorsException mcee) {
-            def text = mcee.toString()
-
-            for (errorMessage in errorMessages) {
-                if (text.contains(errorMessage)) {
-                    return
-                }
-            }
-
-            assert false, text + " can not match any expected error message: " + errorMessages
-        }
+        shouldFailCompilationWithMessage """
+            def List<List<Integer>> history = new ArrayList<List<Integer>()
+        """, "Unexpected input: '('"
     }
 
     // GROOVY-3975
-    void testGenericsInfoForClosureParameters() {
+    void testGenericsForClosureParameters() {
         def cl = { List<String> s -> }
         def type = cl.getClass().getMethod("call", List).genericParameterTypes[0]
         assert type.toString().contains("java.util.List<java.lang.String>")
@@ -277,7 +217,8 @@ final class GenericsUsageTest extends CompilableTestSupport {
         assert type.toString().contains("java.util.List<java.lang.String>")
     }
 
-    void testBoundedGenericsWithInheritanceGroovy4974() {
+    // GROOVY-4974
+    void testBoundedGenericsWithInheritance() {
         assertScript '''
             class TestGenerics {
                 static interface Z {}
@@ -300,20 +241,15 @@ final class GenericsUsageTest extends CompilableTestSupport {
         '''
     }
 
-    void testFriendlyErrorMessageForGenericsArityErrorsGroovy7865() {
+    // GROOVY-7865
+    void testFriendlyErrorMessageForGenericsArityErrors() {
         shouldFailCompilationWithMessages '''
             class MyList extends ArrayList<String, String> {}
         ''', ['(supplied with 2 type parameters)', 'which takes 1 parameter']
 
-        if (CompilerConfiguration.DEFAULT.pluginFactory instanceof AntlrParserPluginFactory) {
-            shouldFailCompilationWithMessages '''
-                class MyList extends ArrayList<> {}
-            ''', ['(supplied with 0 type parameters)', 'which takes 1 parameter', 'invalid Diamond <> usage?']
-        } else {
-            shouldFailCompilationWithMessages '''
-                class MyList extends ArrayList<> {}
-            ''', ['Unexpected input: \'ArrayList<>\'']
-        }
+        shouldFailCompilationWithMessages '''
+            class MyList extends ArrayList<> {}
+        ''', ['Unexpected input: \'<\'']
 
         shouldFailCompilationWithMessages '''
             class MyMap extends HashMap<String> {}
@@ -322,15 +258,9 @@ final class GenericsUsageTest extends CompilableTestSupport {
             class MyList implements List<String, String> {}
         ''', ['(supplied with 2 type parameters)', 'which takes 1 parameter']
 
-        if (CompilerConfiguration.DEFAULT.pluginFactory instanceof AntlrParserPluginFactory) {
-            shouldFailCompilationWithMessages '''
-                class MyList implements Map<> {}
-            ''', ['(supplied with 0 type parameters)', 'which takes 2 parameters', 'invalid Diamond <> usage?']
-        } else {
-            shouldFailCompilationWithMessages '''
-                class MyList implements Map<> {}
-            ''', ['Unexpected input: \'<\'']
-        }
+        shouldFailCompilationWithMessages '''
+            class MyList implements Map<> {}
+        ''', ['Unexpected input: \'<\'']
 
 
         shouldFailCompilationWithMessages '''
@@ -407,5 +337,44 @@ final class GenericsUsageTest extends CompilableTestSupport {
                 'The type Integer is not a valid substitute for the bounded parameter <T extends java.lang.Number & I1>',
                 'The type String is not a valid substitute for the bounded parameter <T extends java.lang.Number>'
         ]
+    }
+
+    //--------------------------------------------------------------------------
+
+    private void shouldFailCompilationWithDefaultMessage(scriptText) {
+        shouldFailCompilationWithMessage scriptText, "Missing closing bracket '>' for generics types"
+    }
+
+    private void shouldFailCompilationWithMessage(scriptText, String errorMessage) {
+        shouldFailCompilationWithMessages(scriptText, [errorMessage])
+    }
+
+    private void shouldFailCompilationWithMessages(scriptText, List<String> errorMessages) {
+        try {
+            assertScript scriptText
+            fail("The script compilation should have failed as it contains generics errors, e.g. mis-matching generic brackets")
+        } catch (MultipleCompilationErrorsException mcee) {
+            def text = mcee.toString()
+            errorMessages.each {
+                assert text.contains(it)
+            }
+        }
+    }
+
+    private void shouldFailCompilationWithAnyMessage(scriptText, List<String> errorMessages) {
+        try {
+            assertScript scriptText
+            fail("The script compilation should have failed as it contains generics errors, e.g. mis-matching generic brackets")
+        } catch (MultipleCompilationErrorsException mcee) {
+            def text = mcee.toString()
+
+            for (errorMessage in errorMessages) {
+                if (text.contains(errorMessage)) {
+                    return
+                }
+            }
+
+            assert false, text + " can not match any expected error message: " + errorMessages
+        }
     }
 }

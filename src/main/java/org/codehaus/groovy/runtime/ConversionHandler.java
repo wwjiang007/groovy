@@ -42,15 +42,7 @@ import java.util.concurrent.ConcurrentHashMap;
 public abstract class ConversionHandler implements InvocationHandler, Serializable {
     private final Object delegate;
     private static final long serialVersionUID = 1162833717190835227L;
-    private final ConcurrentHashMap<Method, Object> handleCache;
-    {
-        if (VMPluginFactory.getPlugin().getVersion() >= 7) {
-            handleCache = new ConcurrentHashMap<Method, Object>(16, 0.9f, 2);
-        } else {
-            handleCache = null;
-        }
-    }
-
+    private final ConcurrentHashMap<Method, Object> handleCache = new ConcurrentHashMap<>(16, 0.9f, 2);
     private MetaClass metaClass;
 
     /**
@@ -99,8 +91,9 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      * @see #invokeCustom(Object, Method, Object[])
      * @see InvocationHandler#invoke(java.lang.Object, java.lang.reflect.Method, java.lang.Object[])
      */
+    @Override
     public Object invoke(final Object proxy, Method method, Object[] args) throws Throwable {
-        if (handleCache != null && isDefaultMethod(method) && !defaultOverridden(method)) {
+        if (isDefaultMethod(method) && !defaultOverridden(method)) {
             final VMPlugin plugin = VMPluginFactory.getPlugin();
             Object handle = handleCache.computeIfAbsent(method, m -> plugin.getInvokeSpecialHandle(m, proxy));
             return plugin.invokeHandle(handle, args);
@@ -164,6 +157,7 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      *
      * @see java.lang.Object#equals(java.lang.Object)
      */
+    @Override
     public boolean equals(Object obj) {
         if (obj instanceof Proxy) {
             obj = Proxy.getInvocationHandler(obj);
@@ -181,6 +175,7 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      *
      * @see java.lang.Object#hashCode()
      */
+    @Override
     public int hashCode() {
         return delegate.hashCode();
     }
@@ -190,6 +185,7 @@ public abstract class ConversionHandler implements InvocationHandler, Serializab
      *
      * @see java.lang.Object#toString()
      */
+    @Override
     public String toString() {
         return delegate.toString();
     }

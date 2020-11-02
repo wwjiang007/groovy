@@ -82,7 +82,7 @@ public class FastArray implements Cloneable, Serializable {
           return;
         final int newSize = this.size + size;
         if (newSize > data.length) {
-            Object nd [] = new Object [newSize];
+            Object[] nd = new Object [newSize];
             System.arraycopy(data, 0, nd, 0, this.size);
             data = nd;
         }
@@ -120,10 +120,12 @@ public class FastArray implements Cloneable, Serializable {
         }
         return new AbstractList() {
 
+            @Override
             public Object get(int index) {
                 return FastArray.this.get(index);
             }
 
+            @Override
             public int size() {
                 return size;
             }
@@ -134,6 +136,7 @@ public class FastArray implements Cloneable, Serializable {
         return data;
     }
 
+    @Override
     public String toString() {
         if (size() == 0) return "[]";
         return toList().toString();

@@ -33,7 +33,6 @@ import javax.xml.parsers.ParserConfigurationException;
 import java.io.IOException;
 import java.io.Reader;
 import java.io.StringReader;
-import java.util.Iterator;
 import java.util.Map;
 
 /**
@@ -149,6 +148,7 @@ public class DOMBuilder extends BuilderSupport {
         this.documentBuilder = documentBuilder;
     }
 
+    @Override
     protected void setParent(Object parent, Object child) {
         Node current = (Node) parent;
         Node node = (Node) child;
@@ -156,6 +156,7 @@ public class DOMBuilder extends BuilderSupport {
         current.appendChild(node);
     }
 
+    @Override
     protected Object createNode(Object name) {
         if (document == null) {
             document = createDocument();
@@ -176,22 +177,25 @@ public class DOMBuilder extends BuilderSupport {
         }
     }
 
+    @Override
     protected Object createNode(Object name, Object value) {
         Element element = (Element) createNode(name);
         element.appendChild(document.createTextNode(value.toString()));
         return element;
     }
 
+    @Override
     protected Object createNode(Object name, Map attributes, Object value) {
         Element element = (Element) createNode(name, attributes);
         element.appendChild(document.createTextNode(value.toString()));
         return element;
     }
 
+    @Override
     protected Object createNode(Object name, Map attributes) {
         Element element = (Element) createNode(name);
-        for (Iterator iter = attributes.entrySet().iterator(); iter.hasNext();) {
-            Map.Entry entry = (Map.Entry) iter.next();
+        for (Object o : attributes.entrySet()) {
+            Map.Entry entry = (Map.Entry) o;
             String attrName = entry.getKey().toString();
             Object value = entry.getValue();
             if ("xmlns".equals(attrName)) {
@@ -225,7 +229,7 @@ public class DOMBuilder extends BuilderSupport {
                 QName qname = (QName) key;
                 element.setAttributeNS(qname.getNamespaceURI(), qname.getQualifiedName(), value.toString());
             } else {
-                throw new IllegalArgumentException("The key: " + key + " should be an instanceof of " + QName.class);
+                throw new IllegalArgumentException("The key: " + key + " should be an instance of " + QName.class);
             }
         }
     }

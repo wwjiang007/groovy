@@ -47,18 +47,19 @@ import groovy.lang.Tuple7;
 import groovy.lang.Tuple8;
 import groovy.lang.Tuple9;
 import org.apache.groovy.util.Maps;
+import org.apache.groovy.util.concurrent.ManagedIdentityConcurrentMap;
 import org.codehaus.groovy.classgen.asm.util.TypeUtil;
 import org.codehaus.groovy.runtime.GeneratedClosure;
 import org.codehaus.groovy.runtime.GeneratedLambda;
 import org.codehaus.groovy.transform.stc.StaticTypeCheckingSupport;
 import org.codehaus.groovy.transform.trait.Traits;
-import org.codehaus.groovy.util.ManagedConcurrentMap;
-import org.codehaus.groovy.util.ReferenceBundle;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
 import org.objectweb.asm.Opcodes;
 
+import java.io.Serializable;
 import java.lang.annotation.Annotation;
 import java.lang.annotation.ElementType;
+import java.lang.invoke.SerializedLambda;
 import java.lang.ref.SoftReference;
 import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
@@ -134,6 +135,8 @@ public class ClassHelper {
             Annotation_TYPE = makeCached(Annotation.class),
             ELEMENT_TYPE_TYPE = makeCached(ElementType.class),
             AUTOCLOSEABLE_TYPE = makeCached(AutoCloseable.class),
+            SERIALIZABLE_TYPE = makeCached(Serializable.class),
+            SERIALIZEDLAMBDA_TYPE = makeCached(SerializedLambda.class),
 
             // uncached constants
             MAP_TYPE = makeWithoutCaching(Map.class),
@@ -404,17 +407,26 @@ public class ClassHelper {
     }
 
     static class ClassHelperCache {
-        static ManagedConcurrentMap<Class, SoftReference<ClassNode>> classCache = new ManagedConcurrentMap<Class, SoftReference<ClassNode>>(ReferenceBundle.getWeakBundle());
+        static ManagedIdentityConcurrentMap<Class, SoftReference<ClassNode>> classCache = new ManagedIdentityConcurrentMap<>(128);
     }
 
-    public static boolean isSAMType(ClassNode type) {
+    public static boolean isSAMType(final ClassNode type) {
         return findSAM(type) != null;
     }
 
-    public static boolean isFunctionalInterface(ClassNode type) {
+    public static boolean isFunctionalInterface(final ClassNode type) {
         // Functional interface must be an interface at first, or the following exception will occur:
         // java.lang.invoke.LambdaConversionException: Functional interface SamCallable is not an interface
         return type.isInterface() && isSAMType(type);
+    }
+
+    /**
+     * Checks if the type is a generated function, i.e. closure or lambda.
+     *
+     * @since 3.0.0
+     */
+    public static boolean isGeneratedFunction(final ClassNode type) {
+        return type.implementsAnyInterfaces(GENERATED_CLOSURE_Type, GENERATED_LAMBDA_TYPE);
     }
 
     /**
@@ -423,7 +435,7 @@ public class ClassHelper {
      * @param type a type for which to search for a single abstract method
      * @return the method node if type is a SAM type, null otherwise
      */
-    public static MethodNode findSAM(ClassNode type) {
+    public static MethodNode findSAM(final ClassNode type) {
         if (!Modifier.isAbstract(type.getModifiers())) return null;
         if (type.isInterface()) {
             List<MethodNode> methods;

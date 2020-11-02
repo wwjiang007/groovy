@@ -210,6 +210,7 @@ public class JsonParserLax extends JsonParserCharArray {
         return new CharSequenceValue(chop, Type.STRING, startIndexOfKey, endIndex + 1, this.charArray, encoded, checkDate);
     }
 
+    @Override
     protected final Object decodeValue() {
         return this.decodeValueInternal();
     }
@@ -351,7 +352,7 @@ public class JsonParserLax extends JsonParserCharArray {
                             }
                         }
                     }
-
+                    // fall through
                 case '/':
                     for (; __index < charArray.length; __index++) {
                         __currentChar = charArray[__index];
@@ -663,6 +664,7 @@ public class JsonParserLax extends JsonParserCharArray {
         return value;
     }
 
+    @Override
     protected final Object decodeFromChars(char[] cs) {
         Value value = ((Value) super.decodeFromChars(cs));
         if (value.isContainer()) {

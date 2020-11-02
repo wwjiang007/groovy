@@ -51,6 +51,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.classX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ctorX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.declS;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ifElseS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.localVarX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.notNullX;
@@ -61,6 +62,12 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.propX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 
 /**
  * Handles generation of code for the @Lazy annotation
@@ -70,6 +77,7 @@ public class LazyASTTransformation extends AbstractASTTransformation {
 
     private static final ClassNode SOFT_REF = makeWithoutCaching(SoftReference.class, false);
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];
@@ -87,7 +95,7 @@ public class LazyASTTransformation extends AbstractASTTransformation {
 
         String backingFieldName = "$" + fieldNode.getName();
         fieldNode.rename(backingFieldName);
-        fieldNode.setModifiers(ACC_PRIVATE | (fieldNode.getModifiers() & (~(ACC_PUBLIC | ACC_PROTECTED))));
+        fieldNode.setModifiers(ACC_PRIVATE | ACC_SYNTHETIC | (fieldNode.getModifiers() & (~(ACC_PUBLIC | ACC_PROTECTED))));
         PropertyNode pNode = fieldNode.getDeclaringClass().getProperty(backingFieldName);
         if (pNode != null) {
             fieldNode.getDeclaringClass().getProperties().remove(pNode);
@@ -212,7 +220,7 @@ public class LazyASTTransformation extends AbstractASTTransformation {
     private static void createSoftSetter(FieldNode fieldNode, ClassNode type) {
         final BlockStatement body = new BlockStatement();
         final Expression fieldExpr = varX(fieldNode);
-        final String name = "set" + capitalize(fieldNode.getName().substring(1));
+        final String name = getSetterName(fieldNode.getName().substring(1));
         final Parameter parameter = param(type, "value");
         final Expression paramExpr = varX(parameter);
         body.addStatement(ifElseS(

@@ -41,7 +41,8 @@ public class PlatformLineWriter extends Writer {
         writer = new BufferedWriter(out, sz);
     }
 
-    public void write(char cbuf[], int off, int len) throws IOException {
+    @Override
+    public void write(char[] cbuf, int off, int len) throws IOException {
         for (; len > 0; len--) {
             char c = cbuf[off++];
             if (c == '\n') {
@@ -52,10 +53,12 @@ public class PlatformLineWriter extends Writer {
         }
     }
 
+    @Override
     public void flush() throws IOException {
         writer.flush();
     }
 
+    @Override
     public void close() throws IOException {
         writer.close();
     }

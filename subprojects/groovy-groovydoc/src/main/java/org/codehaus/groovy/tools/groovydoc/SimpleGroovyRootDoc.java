@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Objects;
 import java.util.regex.Pattern;
 
 public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDoc {
@@ -53,6 +54,7 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
         classNamedCache = new ClassNamedCache(classDocs);
     }
 
+    @Override
     public GroovyClassDoc classNamed(GroovyClassDoc groovyClassDoc, String name) {
         GroovyClassDoc doc = classDocs.get(name);
         if (doc != null) {
@@ -77,6 +79,7 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
         return SimpleGroovyDoc.calculateFirstSentence(description);
     }
 
+    @Override
     public GroovyClassDoc[] classes() {
         if (classDocValues == null) {
             classDocValues = new ArrayList<GroovyClassDoc>(classDocs.values());
@@ -85,10 +88,12 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
         return classDocValues.toArray(EMPTY_GROOVYCLASSDOC_ARRAY);
     }
 
+    @Override
     public String[][] options() {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyPackageDoc packageNamed(String packageName) {
         return packageDocs.get(packageName);
     }
@@ -103,10 +108,12 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
         packageDocValues = null;
     }
 
+    @Override
     public GroovyClassDoc[] specifiedClasses() {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyPackageDoc[] specifiedPackages() {
         if (packageDocValues == null) {
             packageDocValues = new ArrayList<GroovyPackageDoc>(packageDocs.values());
@@ -115,6 +122,7 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
         return packageDocValues.toArray(EMPTY_GROOVYPACKAGEDOC_ARRAY);
     }
 
+    @Override
     public Map<String, GroovyClassDoc> getVisibleClasses(List importedClassesAndPackages) {
         Map<String, GroovyClassDoc> visibleClasses = new LinkedHashMap<String, GroovyClassDoc>();
         for (Map.Entry<String, GroovyClassDoc> entry : classDocs.entrySet()) {
@@ -144,12 +152,15 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
     }
 
     // GroovyDocErrorReporter interface
+    @Override
     public void printError(String arg0) {/*todo*/}
 
     //    public void printError(GroovySourcePosition arg0, String arg1) {/*todo*/}
+    @Override
     public void printNotice(String arg0) {/*todo*/}
 
     //    public void printNotice(GroovySourcePosition arg0, String arg1) {/*todo*/}
+    @Override
     public void printWarning(String arg0) {/*todo*/}
 //    public void printWarning(GroovySourcePosition arg0, String arg1) {/*todo*/}
 
@@ -223,7 +234,7 @@ public class SimpleGroovyRootDoc extends SimpleGroovyDoc implements GroovyRootDo
 
                 final Entry entry = (Entry) o;
 
-                if (groovyClass != null ? !groovyClass.equals(entry.groovyClass) : entry.groovyClass != null)
+                if (!Objects.equals(groovyClass, entry.groovyClass))
                     return false;
                 return name.equals(entry.name);
             }

@@ -80,6 +80,9 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.ternaryX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
 
 /**
  * Handles generation of code for the @AutoClone annotation.
@@ -96,6 +99,7 @@ public class AutoCloneASTTransformation extends AbstractASTTransformation {
     private static final ClassNode OIS_TYPE = make(ObjectInputStream.class);
     private static final ClassNode INVOKER_TYPE = make(InvokerHelper.class);
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];

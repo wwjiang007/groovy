@@ -20,6 +20,7 @@ package org.codehaus.groovy.util;
 
 import java.lang.reflect.Array;
 import java.util.Iterator;
+import java.util.NoSuchElementException;
 
 public class ArrayIterator<T> implements Iterator<T> {
     private final T[] array;
@@ -31,15 +32,21 @@ public class ArrayIterator<T> implements Iterator<T> {
         length = Array.getLength(array);
     }
 
+    @Override
     public boolean hasNext() {
         return index < length;
     }
 
+    @Override
     @SuppressWarnings("unchecked")
     public T next() {
+        if (!hasNext()) {
+            throw new NoSuchElementException();
+        }
         return (T) Array.get(array, index++);
     }
 
+    @Override
     public void remove() {
         throw new UnsupportedOperationException("Remove not supported for arrays");
     }

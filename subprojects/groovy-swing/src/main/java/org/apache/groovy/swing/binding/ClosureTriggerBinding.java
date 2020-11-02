@@ -23,6 +23,7 @@ import groovy.lang.GroovyObjectSupport;
 import groovy.lang.Reference;
 import org.codehaus.groovy.reflection.ReflectionUtils;
 
+import java.lang.reflect.AccessibleObject;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.Field;
 import java.security.PrivilegedAction;
@@ -60,6 +61,7 @@ public class ClosureTriggerBinding implements TriggerBinding, SourceBinding {
         return bp;
     }
 
+    @Override
     public FullBinding createBinding(SourceBinding source, TargetBinding target) {
         if (source != this) {
             throw new RuntimeException("Source binding must the Trigger Binding as well");
@@ -71,6 +73,7 @@ public class ClosureTriggerBinding implements TriggerBinding, SourceBinding {
 
             // do in privileged block since we may be looking at private stuff
             Closure closureLocalCopy = java.security.AccessController.doPrivileged(new PrivilegedAction<Closure>() {
+                @Override
                 public Closure run() {
                     // assume closures have only 1 constructor, of the form (Object, Reference*)
                     Constructor constructor = closureClass.getConstructors()[0];
@@ -78,16 +81,16 @@ public class ClosureTriggerBinding implements TriggerBinding, SourceBinding {
                     Object[] args = new Object[paramCount];
                     args[0] = delegate;
                     for (int i = 1; i < paramCount; i++) {
-                        args[i] = new Reference(new BindPathSnooper());
+                        args[i] = new Reference<Object>(new BindPathSnooper());
                     }
                     try {
-                        boolean acc = constructor.isAccessible();
+                        boolean acc = isAccessible(constructor);
                         ReflectionUtils.trySetAccessible(constructor);
                         Closure localCopy = (Closure) constructor.newInstance(args);
                         if (!acc) { constructor.setAccessible(false); }
                         localCopy.setResolveStrategy(Closure.DELEGATE_ONLY);
                         for (Field f:closureClass.getDeclaredFields()) {
-                            acc = f.isAccessible();
+                            acc = isAccessible(f);
                             ReflectionUtils.trySetAccessible(f);
                             if (f.getType() == Reference.class) {
                                 delegate.fields.put(f.getName(),
@@ -128,6 +131,13 @@ public class ClosureTriggerBinding implements TriggerBinding, SourceBinding {
         return fb;
     }
 
+    // TODO when JDK9+ is minimum, use canAccess and remove suppression
+    @SuppressWarnings("deprecation")
+    private boolean isAccessible(AccessibleObject accessibleObject) {
+        return accessibleObject.isAccessible();
+    }
+
+    @Override
     public Object getSourceValue() {
         return closure.call();
     }
@@ -151,6 +161,7 @@ class BindPathSnooper extends GroovyObjectSupport {
 
     Map<String, BindPathSnooper> fields = new LinkedHashMap<String, BindPathSnooper>();
 
+    @Override
     public Object getProperty(String property) {
         if (fields.containsKey(property)) {
             return fields.get(property);
@@ -161,6 +172,7 @@ class BindPathSnooper extends GroovyObjectSupport {
         }
     }
 
+    @Override
     public Object invokeMethod(String name, Object args) {
         return DEAD_END;
     }

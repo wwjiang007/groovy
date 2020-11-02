@@ -24,13 +24,16 @@ import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.classgen.asm.BytecodeHelper;
+import org.codehaus.groovy.syntax.RuntimeParserException;
 import org.objectweb.asm.Handle;
 import org.objectweb.asm.Opcodes;
 import org.objectweb.asm.Type;
 
 import java.util.Arrays;
+import java.util.LinkedList;
 import java.util.List;
 
+import static org.codehaus.groovy.ast.ClassHelper.getUnwrapper;
 import static org.codehaus.groovy.ast.ClassHelper.getWrapper;
 import static org.codehaus.groovy.transform.stc.StaticTypesMarker.INFERRED_FUNCTIONAL_INTERFACE_TYPE;
 import static org.codehaus.groovy.transform.stc.StaticTypesMarker.PARAMETER_TYPE;
@@ -60,7 +63,17 @@ public interface AbstractFunctionalInterfaceWriter {
         );
     }
 
-    default Handle createBootstrapMethod(boolean isInterface) {
+    default Handle createBootstrapMethod(boolean isInterface, boolean serializable) {
+        if (serializable) {
+            return new Handle(
+                    Opcodes.H_INVOKESTATIC,
+                    "java/lang/invoke/LambdaMetafactory",
+                    "altMetafactory",
+                    "(Ljava/lang/invoke/MethodHandles$Lookup;Ljava/lang/String;Ljava/lang/invoke/MethodType;[Ljava/lang/Object;)Ljava/lang/invoke/CallSite;",
+                    isInterface
+            );
+        }
+
         return new Handle(
                 Opcodes.H_INVOKESTATIC,
                 "java/lang/invoke/LambdaMetafactory",
@@ -70,34 +83,52 @@ public interface AbstractFunctionalInterfaceWriter {
         );
     }
 
-    default Object[] createBootstrapMethodArguments(String abstractMethodDesc, int insn, ClassNode methodOwnerClassNode, MethodNode methodNode) {
+    default Object[] createBootstrapMethodArguments(String abstractMethodDesc, int insn, ClassNode methodOwnerClassNode, MethodNode methodNode, boolean serializable) {
         Parameter[] parameters = methodNode.getNodeMetaData(ORIGINAL_PARAMETERS_WITH_EXACT_TYPE);
+        List<Object> argumentList = new LinkedList<>();
 
-        return new Object[]{
-                Type.getType(abstractMethodDesc),
+        argumentList.add(Type.getType(abstractMethodDesc));
+        argumentList.add(
                 new Handle(
                         insn,
                         BytecodeHelper.getClassInternalName(methodOwnerClassNode.getName()),
                         methodNode.getName(),
                         BytecodeHelper.getMethodDescriptor(methodNode),
                         methodOwnerClassNode.isInterface()
-                ),
-                Type.getType(BytecodeHelper.getMethodDescriptor(methodNode.getReturnType(), parameters))
-        };
+                )
+        );
+        argumentList.add(Type.getType(BytecodeHelper.getMethodDescriptor(methodNode.getReturnType(), parameters)));
+
+        if (serializable) {
+            argumentList.add(5);
+            argumentList.add(0);
+        }
+
+        return argumentList.toArray();
     }
 
     default ClassNode convertParameterType(ClassNode parameterType, ClassNode inferredType) {
+        if (!getWrapper(inferredType.redirect()).isDerivedFrom(getWrapper(parameterType.redirect()))) {
+            throw new RuntimeParserException("The inferred type[" + inferredType.redirect() + "] is not compatible with the parameter type[" + parameterType.redirect() + "]", parameterType);
+        }
+
         ClassNode type;
         boolean isParameterTypePrimitive = ClassHelper.isPrimitiveType(parameterType);
         boolean isInferredTypePrimitive = ClassHelper.isPrimitiveType(inferredType);
         if (!isParameterTypePrimitive && isInferredTypePrimitive) {
-            // The non-primitive type and primitive type are not allowed to mix since Java 9+
-            // java.lang.invoke.LambdaConversionException: Type mismatch for instantiated parameter 0: int is not a subtype of class java.lang.Object
-            type = getWrapper(inferredType);
+            if (parameterType != getUnwrapper(parameterType) && inferredType != getWrapper(inferredType)) {
+                // GROOVY-9790: bootstrap method initialization exception raised when lambda parameter type is wrong
+                // java.lang.BootstrapMethodError: bootstrap method initialization exception
+                type = inferredType;
+            } else {
+                // The non-primitive type and primitive type are not allowed to mix since Java 9+
+                // java.lang.invoke.LambdaConversionException: Type mismatch for instantiated parameter 0: int is not a subtype of class java.lang.Object
+                type = getWrapper(inferredType);
+            }
         } else if (isParameterTypePrimitive && !isInferredTypePrimitive) {
             // The non-primitive type and primitive type are not allowed to mix since Java 9+
             // java.lang.invoke.LambdaConversionException: Type mismatch for instantiated parameter 0: class java.lang.Integer is not a subtype of int
-            type = ClassHelper.getUnwrapper(inferredType);
+            type = getUnwrapper(inferredType);
         } else {
             type = inferredType;
         }

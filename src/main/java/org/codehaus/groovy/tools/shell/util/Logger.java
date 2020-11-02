@@ -30,7 +30,7 @@ import static org.fusesource.jansi.Ansi.ansi;
  * Provides a very, very basic logging API.
  */
 public final class Logger {
-    public static IO io;
+    public static volatile IO io;
     public final String name;
 
     private Logger(final String name) {
@@ -58,12 +58,11 @@ public final class Logger {
             }
         }
 
-        Color color = GREEN;
-        if (WARN.equals(level) || ERROR.equals(level)) {
-            color = RED;
+        if (io.ansiSupported) {
+            logWithAnsi(level, msg);
+        } else {
+            logDefault(level, msg);
         }
-
-        io.out.println(ansi().a(INTENSITY_BOLD).fg(color).a(level).reset().a(" [").a(name).a("] ").a(msg));
 
         if (cause != null) {
             cause.printStackTrace(io.out);
@@ -71,7 +70,19 @@ public final class Logger {
 
         io.flush();
     }
-    
+
+    private void logDefault(String level, Object msg) {
+        io.out.println(level + " [" + name + "] " + msg);
+    }
+
+    private void logWithAnsi(String level, Object msg) {
+        Color color = GREEN;
+        if (WARN.equals(level) || ERROR.equals(level)) {
+            color = RED;
+        }
+        io.out.println(ansi().a(INTENSITY_BOLD).fg(color).a(level).reset().a(" [").a(name).a("] ").a(msg));
+    }
+
     //
     // Level helpers
     //

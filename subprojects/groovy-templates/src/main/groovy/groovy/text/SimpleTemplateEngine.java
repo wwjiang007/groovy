@@ -33,6 +33,7 @@ import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Processes template source files substituting variables and expressions into
@@ -91,7 +92,7 @@ import java.util.Map;
  */
 public class SimpleTemplateEngine extends TemplateEngine {
     private boolean verbose;
-    private static int counter = 1;
+    private static AtomicInteger counter = new AtomicInteger(0);
     private GroovyShell groovyShell;
     private boolean escapeBackslash;
 
@@ -112,6 +113,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
         this.groovyShell = groovyShell;
     }
 
+    @Override
     public Template createTemplate(Reader reader) throws CompilationFailedException, IOException {
         SimpleTemplate template = new SimpleTemplate(escapeBackslash);
         String script = template.parse(reader);
@@ -121,7 +123,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
             System.out.println("\n-- script end --\n");
         }
         try {
-            template.script = groovyShell.parse(script, "SimpleTemplateScript" + counter++ + ".groovy");
+            template.script = groovyShell.parse(script, "SimpleTemplateScript" + counter.incrementAndGet() + ".groovy");
         } catch (Exception e) {
             throw new GroovyRuntimeException("Failed to parse template script (your template may contain an error or be trying to use expressions not currently supported): " + e.getMessage());
         }
@@ -153,10 +155,12 @@ public class SimpleTemplateEngine extends TemplateEngine {
         }
 
 
+        @Override
         public Writable make() {
             return make(null);
         }
 
+        @Override
         public Writable make(final Map map) {
             return new Writable() {
                 /**
@@ -164,6 +168,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
                  *
                  * @see groovy.lang.Writable#writeTo(java.io.Writer)
                  */
+                @Override
                 public Writer writeTo(Writer writer) {
                     Binding binding;
                     if (map == null)
@@ -183,6 +188,7 @@ public class SimpleTemplateEngine extends TemplateEngine {
                  *
                  * @see java.lang.Object#toString()
                  */
+                @Override
                 public String toString() {
                     Writer sw = new StringBuilderWriter();
                     writeTo(sw);

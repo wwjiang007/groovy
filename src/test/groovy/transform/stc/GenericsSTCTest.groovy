@@ -19,26 +19,26 @@
 package groovy.transform.stc
 
 import groovy.test.NotYetImplemented
-import org.codehaus.groovy.antlr.AntlrParserPluginFactory
+import org.codehaus.groovy.tools.javac.JavaAwareCompilationUnit
 
 /**
  * Unit tests for static type checking : generics.
  */
 class GenericsSTCTest extends StaticTypeCheckingTestCase {
 
-    void testDeclaration() {
+    void testDeclaration1() {
         assertScript '''
             List test = new LinkedList<String>()
         '''
     }
 
-    void testDeclaration5() {
+    void testDeclaration2() {
         assertScript '''
             Map<String,Integer> obj = new HashMap<String,Integer>()
         '''
     }
 
-    void testDeclaration6() {
+    void testDeclaration3() {
         shouldFailWithMessages '''
             Map<String,String> obj = new HashMap<String,Integer>()
         ''', 'Incompatible generic argument types. Cannot assign java.util.HashMap <String, Integer> to: java.util.Map <String, String>'
@@ -159,15 +159,54 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    void testReturnTypeInferenceWithMethodGenerics() {
+    void testReturnTypeInferenceWithMethodGenerics1() {
         assertScript '''
             List<Long> list = Arrays.asList([0L,0L] as Long[])
+            assert list.size() == 2
         '''
     }
 
-    void testReturnTypeInferenceWithMethodGenericsAndVarArg() {
+    void testReturnTypeInferenceWithMethodGenerics2() {
         assertScript '''
             List<Long> list = Arrays.asList(0L,0L)
+            assert list.size() == 2
+        '''
+    }
+
+    void testReturnTypeInferenceWithMethodGenerics3() {
+        assertScript '''
+            Number number = Optional.of(42).get()
+            assert number.intValue() == 42
+        '''
+    }
+
+    // GROOVY-9796
+    void testReturnTypeInferenceWithMethodGenerics4() {
+        shouldFailWithMessages '''
+            Number number = Optional.of(42).orElse(Double.NaN)
+            assert number.intValue() == 42
+        ''', '[Static type checking] - Cannot find matching method java.util.Optional#orElse(double).'
+    }
+
+    void testReturnTypeInferenceWithMethodGenerics5() {
+        assertScript '''
+            Number number = Optional.of((Number) 42).orElse(Double.NaN)
+            assert number.intValue() == 42
+        '''
+    }
+
+    // GROOVY-9796
+    void testReturnTypeInferenceWithMethodGenerics6() {
+        shouldFailWithMessages '''
+            Number number = Optional.ofNullable((Integer) null).orElse(42d)
+            assert number.intValue() == 42
+        ''', '[Static type checking] - Cannot find matching method java.util.Optional#orElse(double).'
+    }
+
+    void testReturnTypeInferenceWithMethodGenerics7() {
+        assertScript '''
+            Number number = Optional.<Number>ofNullable((Integer) null).orElse(42d)
+            assert number.intValue() == 42
         '''
     }
 
@@ -195,7 +234,6 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-
     void testLinkedListWithListArgument() {
         assertScript '''
             List<String> list = new LinkedList<String>(['1','2','3'])
@@ -205,10 +243,10 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
     void testLinkedListWithListArgumentAndWrongElementTypes() {
         shouldFailWithMessages '''
             List<String> list = new LinkedList<String>([1,2,3])
-        ''', 'Cannot call java.util.LinkedList <String>#<init>(java.util.Collection <java.lang.Object extends java.lang.String>) with arguments [java.util.List <java.lang.Integer>]'
+        ''', 'Cannot call java.util.LinkedList <String>#<init>(java.util.Collection <? extends java.lang.String>) with arguments [java.util.List <java.lang.Integer>]'
     }
 
-    void testCompatibleGenericAssignmentWithInference() {
+    void testIncompatibleGenericAssignment() {
         shouldFailWithMessages '''
             List<String> elements = ['a','b', 1]
         ''', 'Incompatible generic argument types. Cannot assign java.util.List <java.io.Serializable> to: java.util.List <String>'
@@ -240,6 +278,70 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         shouldFailWithMessages '''
             List<? super Number> list = ['string']
         ''', 'Number'
+    }
+
+    // GROOVY-9555
+    void testAssignmentShouldWorkForProperUpperBound() {
+        assertScript '''
+            interface I<T> {
+            }
+            class C implements I<Object> {
+            }
+            interface Factory {
+                def <T extends I> T getInstance(Class<T> clazz)
+            }
+
+            void test(Factory f) {
+                C c = f.getInstance(C)
+                assert c instanceof C
+                assert c instanceof I
+            }
+            test { Class clazz -> clazz.newInstance() }
+        '''
+
+        config.with {
+            targetDirectory = File.createTempDir()
+            jointCompilationOptions = [stubDir: File.createTempDir()]
+        }
+        File parentDir = File.createTempDir()
+        try {
+            def a = new File(parentDir, 'Face.java')
+            a.write '''
+                public interface Face<T> {
+                }
+            '''
+            def b = new File(parentDir, 'Impl.java')
+            b.write '''
+                public class Impl implements Face<Object> {
+                }
+            '''
+            def c = new File(parentDir, 'Supplier.java')
+            c.write '''
+                public interface Supplier {
+                    public <T extends Face> T getInstance(Class<T> clazz);
+                }
+            '''
+            def d = new File(parentDir, 'Tester.groovy')
+            d.write '''
+                void test(Supplier s) {
+                    def x = s.getInstance(Impl)
+                    assert x instanceof Impl
+                    assert x instanceof Face
+                }
+                test { Class clazz -> clazz.newInstance() }
+            '''
+
+            def loader = new GroovyClassLoader(this.class.classLoader)
+            def cu = new JavaAwareCompilationUnit(config, loader)
+            cu.addSources(a, b, c, d)
+            cu.compile()
+
+            loader.loadClass('Tester').main()
+        } finally {
+            parentDir.deleteDir()
+            config.targetDirectory.deleteDir()
+            config.jointCompilationOptions.stubDir.deleteDir()
+        }
     }
 
     void testGroovy5154() {
@@ -393,6 +495,22 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
+    // GROOVY-9460
+    void testMethodCallWithClassParameterUnbounded() {
+        assertScript '''
+            class Bar {
+                static void baz(Class<?> target) {
+                }
+            }
+            class Foo<D> { // cannot be "T" because that matches type parameter in Class
+                void test(Class<D> param) {
+                    Bar.baz(param) // Cannot call Bar#baz(java.lang.Class<?>) with arguments [java.lang.Class<D>]
+                }
+            }
+            new Foo<String>().test(String.class)
+        '''
+    }
+
     void testConstructorCallWithClassParameterUsingClassLiteralArg() {
         assertScript '''
             class A {}
@@ -441,7 +559,6 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
     }
 
     void testShouldComplainAboutToInteger() {
-
         String code = '''
             class Test {
                 static test2() {
@@ -465,13 +582,9 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             new Test()
         '''
 
-        if (config.pluginFactory instanceof AntlrParserPluginFactory) {
-            shouldFailWithMessages code, 'Cannot find matching method java.lang.Object#getAt(int)'
-        } else {
-            shouldFailWithMessages code,
-                    'Cannot find matching method java.lang.Object#getAt(int)',
-                    'Cannot find matching method java.lang.Object#toInteger()'
-        }
+        shouldFailWithMessages code,
+                'Cannot find matching method java.lang.Object#getAt(int)',
+                'Cannot find matching method java.lang.Object#toInteger()'
     }
 
     void testAssignmentOfNewInstance() {
@@ -514,6 +627,121 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         ''', 'Cannot call <X> groovy.transform.stc.GenericsSTCTest$ClassA <Long>#bar(java.lang.Class <Long>) with arguments [java.lang.Class <? extends java.lang.Object>]'
     }
 
+    // GROOVY-8961
+    void testShouldUseMethodGenericType3() {
+        assertScript '''
+            void setM(List<String> strings) {
+            }
+            void test() {
+              m = Collections.emptyList() // Cannot assign value of type List<T> to variable of List<String>
+            }
+            test()
+        '''
+        assertScript '''
+            void setM(Collection<String> strings) {
+            }
+            void test() {
+              m = Collections.emptyList()
+            }
+            test()
+        '''
+        assertScript '''
+            void setM(Iterable<String> strings) {
+            }
+            void test() {
+              m = Collections.emptyList()
+            }
+            test()
+        '''
+
+        shouldFailWithMessages '''
+            void setM(List<String> strings) {
+            }
+            void test() {
+              m = Collections.<Integer>emptyList()
+            }
+        ''', '[Static type checking] - Cannot assign value of type java.util.List <Integer> to variable of type java.util.List <String>'
+    }
+
+    // GROOVY-9734
+    void testShouldUseMethodGenericType4() {
+        assertScript '''
+            void m(List<String> strings) {
+            }
+            void test() {
+              m(Collections.emptyList()) // Cannot call m(List<String>) with arguments [List<T>]
+            }
+            test()
+        '''
+        assertScript '''
+            void m(Collection<String> strings) {
+            }
+            void test() {
+              m(Collections.emptyList())
+            }
+            test()
+        '''
+        assertScript '''
+            void m(Iterable<String> strings) {
+            }
+            void test() {
+              m(Collections.emptyList())
+            }
+            test()
+        '''
+    }
+
+    // GROOVY-9751
+    void testShouldUseMethodGenericType5() {
+        assertScript '''
+            interface Service {
+                Number transform(String s)
+            }
+            void test(Service service) {
+                Set<Number> numbers = []
+                List<String> strings = ['1','2','3']
+                numbers.addAll(strings.collect(service.&transform))
+            }
+            test({ String s -> Integer.valueOf(s) } as Service)
+        '''
+    }
+
+    void testShouldUseMethodGenericType6() {
+        assertScript '''
+            @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                def type = node.rightExpression.getNodeMetaData(INFERRED_TYPE)
+                assert type.equals(CLOSURE_TYPE)
+                assert type.getGenericsTypes()[0].getType().equals(STRING_TYPE)
+            })
+            def ptr = "".&toString
+        '''
+        assertScript '''
+            @ASTTest(phase=INSTRUCTION_SELECTION, value={
+                def type = node.rightExpression.getNodeMetaData(INFERRED_TYPE)
+                assert type.equals(CLOSURE_TYPE)
+                assert type.getGenericsTypes()[0].getType().equals(Double_TYPE)
+            })
+            def ptr = Math.&abs
+        '''
+    }
+
+    // GROOVY-9762
+    void testShouldUseMethodGenericType7() {
+        for (toList in ['{ list(it) }', 'o -> list(o)', 'this.&list', 'this::list']) {
+            assertScript """
+                def <T> List<T> list(T item) {
+                    return [item]
+                }
+                def test() {
+                    Optional<Integer> opt = Optional.ofNullable(1)
+                    List<Integer> ret = opt.map($toList).get()
+                    return ret
+                }
+                assert test() == [1]
+            """
+        }
+    }
+
     // GROOVY-5516
     void testAddAllWithCollectionShouldBeAllowed() {
         assertScript '''import org.codehaus.groovy.transform.stc.ExtensionMethodNode
@@ -534,7 +762,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             List<String> list = ['a','b','c']
             Collection<Integer> e = (Collection<Integer>) [1,2,3]
             boolean r = list.addAll(e)
-        ''', 'Cannot call java.util.List <java.lang.String>#addAll(java.util.Collection <java.lang.Object extends java.lang.String>) with arguments [java.util.Collection <Integer>]'
+        ''', 'Cannot call java.util.List <java.lang.String>#addAll(java.util.Collection <? extends java.lang.String>) with arguments [java.util.Collection <Integer>]'
     }
 
     // GROOVY-5528
@@ -913,6 +1141,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             printEqual(1, 'foo')
         ''', '#printEqual(T, T) with arguments [int, java.lang.String]'
     }
+
     void testIncompatibleGenericsForTwoArgumentsUsingEmbeddedPlaceholder() {
         shouldFailWithMessages '''
             public <T> void printEqual(T arg1, List<T> arg2) {
@@ -1147,7 +1376,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
     }
 
     // GROOVY-5724
-    void testJunitHamcrest() {
+    void testJUnitHamcrest() {
         assertScript '''
             public class Matcher<T> {}
             public <T> void assertThat(T obj, Matcher<T> matcher) {}
@@ -1155,6 +1384,41 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             String result = '12345'.substring(2)
             // assert
             assertThat(result, notNullValue())
+        '''
+    }
+
+    // GROOVY-8103
+    void testJUnitFestAssert() {
+        assertScript '''
+            import static Fluent.*
+            import Util.Ours
+
+            class Fluent {
+                static FluentAPI  fluent(String s) { return new FluentAPI() }
+                static <T extends FluentExtension> T fluent(T t) { return t }
+            }
+
+            class FluentAPI {
+                FluentAPI isEqualTo(String s) { return this }
+            }
+
+            interface FluentExtension {
+            }
+
+            class Util {
+                static class Ours implements FluentExtension {
+                    Ours isSimilarTo(String json) { return this }
+                }
+                static Ours factory(String json) { new Ours() }
+            }
+
+            void test() {
+                fluent('string').isEqualTo('x') // fine
+                fluent(new Ours()).isSimilarTo('') // fine
+                fluent(Util.factory('{}')).isSimilarTo('{"key":"val"}') // STC error
+            }
+
+            test()
         '''
     }
 
@@ -1316,7 +1580,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         ''', '[Static type checking] - Cannot find matching method Foo#<init>(java.lang.String, int)'
     }
 
-    // Groovy-5742
+    // GROOVY-5742
     void testNestedGenerics() {
         assertScript '''
             import static Next.*
@@ -1330,6 +1594,18 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             }
 
             Next<Integer, Next<String, Done>> x = next(3, next("foo", new Done()))
+        '''
+    }
+
+    // GROOVY-7848
+    void testNestedGenerics2() {
+        assertScript '''
+            List<Integer> test() {
+              def listOfLists = [[1,2], [3,4]]
+              listOfLists.collect { pair -> pair[0] + pair[1] }
+            }
+            def result = test()
+            assert result == [3,7]
         '''
     }
 
@@ -1349,7 +1625,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
         '''
     }
 
-    // Groovy-5610
+    // GROOVY-5610
     void testMethodWithDefaultArgument() {
         assertScript '''
             class A{}
@@ -1370,7 +1646,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             List<Object> l = new ArrayList<>()
             assert foo(l) == 1
         ''',
-        '#foo(java.util.List <A extends A>) with arguments [java.util.ArrayList <java.lang.Object>]'
+        '#foo(java.util.List <? extends A>) with arguments [java.util.ArrayList <java.lang.Object>]'
     }
 
     void testMethodLevelGenericsForMethodCall() {
@@ -1396,7 +1672,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
             def cl = {1}
             assert foo(cl.class, cl) == cl
          '''
-         //GROOVY-5885
+         // GROOVY-5885
          assertScript '''
             class Test {
                 public <X extends Test> X castToMe(Class<X> type, Object o) {
@@ -1408,7 +1684,7 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
          '''
     }
 
-    // Groovy-5839
+    // GROOVY-5839
     void testMethodShadowGenerics() {
         shouldFailWithMessages '''
             public class GoodCodeRed<T> {
@@ -1501,7 +1777,6 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
     // GROOVY-6455
     void testDelegateWithGenerics() {
         assertScript '''
-            @groovy.transform.CompileStatic
             class IntList {
                 @Delegate List<Integer> delegate = new ArrayList<Integer>()
             }
@@ -1702,42 +1977,45 @@ class GenericsSTCTest extends StaticTypeCheckingTestCase {
 
     // GROOVY-6731
     void testContravariantMethodResolution() {
-        assertScript '''interface Function<T, R> {
+        assertScript '''
+            interface Function<T, R> {
+                R apply(T t)
+            }
 
-    R apply(T t)
+            public <I, O> void transform(Function<? super I, ? extends O> function) {
+                function.apply('')
+            }
 
-}
-public <I, O> void transform(Function<? super I, ? extends O> function) { function.apply('')}
+            String result = null
+            transform(new Function<String, String>() {
+                String apply(String input) {
+                    result = "ok"
+                }
+            })
 
-String result = null
-transform(new Function<String, String>() {
-
-    String apply(String input) {
-        result = "ok"
+            assert result == 'ok'
+        '''
     }
-})
 
-assert result == 'ok\''''
-    }
     void testContravariantMethodResolutionWithImplicitCoercion() {
-        assertScript '''interface Function<T, R> {
+        assertScript '''
+            interface Function<T, R> {
+                R apply(T t)
+            }
 
-    R apply(T t)
+            public <I, O> void transform(Function<? super I, ? extends O> function) {
+                function.apply('')
+            }
 
-}
-public <I, O> void transform(Function<? super I, ? extends O> function) { function.apply('')}
-
-String result = null
-transform {
-        result = "ok"
-}
-
-
-assert result == 'ok'
-'''
+            String result = null
+            transform {
+                result = 'ok'
+            }
+            assert result == 'ok'
+        '''
     }
 
-    void testGROOVY5981(){
+    void testGROOVY5981() {
         assertScript '''
             import javax.swing.*
             import java.awt.*
@@ -1777,6 +2055,128 @@ assert result == 'ok'
         '''
     }
 
+    // GROOVY-7691
+    void testCovariantReturnTypeInferredFromField() {
+        assertScript '''
+            import groovy.transform.*
+
+            @TupleConstructor(includeFields=true)
+            abstract class A<N extends Number> {
+                protected final N number
+            }
+
+            class C<L extends Long> extends A<L> { // further restriction of type parameter
+                C(L longNumber) {
+                    super(longNumber)
+                }
+
+                L getValue() {
+                    return number
+                }
+            }
+
+            assert new C<Long>(42L).value == 42L
+        '''
+    }
+
+    // GROOVY-7691
+    void testCovariantReturnTypeInferredFromProperty() {
+        assertScript '''
+            import groovy.transform.*
+
+            @TupleConstructor
+            abstract class A<N extends Number> {
+                final N number
+            }
+
+            class C<L extends Long> extends A<L> {
+                C(L longNumber) {
+                    super(longNumber)
+                }
+
+                L getValue() {
+                    return number
+                }
+            }
+
+            assert new C<Long>(42L).value == 42L
+        '''
+    }
+
+    void testCovariantReturnTypeInferredFromMethod1() {
+        assertScript '''
+            import groovy.transform.*
+
+            @TupleConstructor(includeFields=true)
+            abstract class A<N extends Number> {
+                protected final N number
+
+                protected N getNumber() {
+                    return number
+                }
+            }
+
+            class C<L extends Long> extends A<L> {
+                C(L longNumber) {
+                    super(longNumber)
+                }
+
+                L getValue() {
+                    return getNumber()
+                }
+            }
+
+            assert new C<Long>(42L).value == 42L
+        '''
+    }
+
+    // GROOVY-9580
+    void testCovariantReturnTypeInferredFromMethod2() {
+        assertScript '''
+            import groovy.transform.*
+
+            @TupleConstructor(includeFields=true)
+            abstract class A<N extends Number> {
+                final N number
+            }
+
+            class C<L extends Long> extends A<L> {
+                C(L longNumber) {
+                    super(longNumber)
+                }
+
+                L getValue() {
+                    return getNumber() // property method stubbed by StaticTypeCheckingVisitor
+                }
+            }
+
+            assert new C<Long>(42L).value == 42L
+        '''
+    }
+
+    // GROOVY-9635
+    void testCovariantReturnTypeInferredFromMethod3() {
+        assertScript '''
+            import java.util.function.Function
+
+            class C<R extends Number> {
+                def <V> V m(Function<C, V> f) { // R from C is confused with R->V from Function
+                    V result = f.apply(this)
+                    return result
+                }
+            }
+
+            def ret = new C().m(new Function<C, String>() {
+                @Override
+                String apply(C that) {
+                    return 'foo'
+                }
+            })
+
+            assert ret == 'foo'
+        '''
+    }
+
     void testReturnTypeChecking() {
         shouldFailWithMessages '''
             class Foo {
@@ -1798,8 +2198,7 @@ assert result == 'ok'
         '''
     }
 
-
-    //GROOVY-7804
+    // GROOVY-7804
     void testParameterlessClosureToGenericSAMTypeArgumentCoercion() {
         assertScript '''
             interface Supplier<T> {
@@ -1812,7 +2211,7 @@ assert result == 'ok'
         '''
     }
 
-    //GROOVY-7713
+    // GROOVY-7713
     void testClosureReturnNull() {
         assertScript '''
             Closure<String> cl = {
@@ -1846,6 +2245,4 @@ assert result == 'ok'
         public static <T> List<T> unwrap(Collection<? extends Container<T>> list) {
         }
     }
-
 }
-

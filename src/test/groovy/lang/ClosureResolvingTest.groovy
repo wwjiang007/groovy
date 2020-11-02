@@ -25,8 +25,7 @@ import groovy.test.GroovyTestCase
  *
  * @since 1.5
  */
-
-class ClosureResolvingTest extends GroovyTestCase {
+final class ClosureResolvingTest extends GroovyTestCase {
 
     def foo = "bar"
     def bar = "foo"
@@ -84,7 +83,33 @@ class ClosureResolvingTest extends GroovyTestCase {
         assertEquals "stuff", c.call()
         c.delegate = new TestResolve1()
         assertEquals "foo", c.call()
+    }
 
+    // GROOVY-7701
+    void testResolveDelegateFirst2() {
+        assertScript '''
+            class Foo {
+                List type
+            }
+            class Bar {
+                int type = 10
+                List<Foo> something = { ->
+                    List<Foo> tmp = []
+                    def foo = new Foo()
+                    foo.with {
+                        type = ['String']
+                    //  ^^^^ should be Foo.type, not Bar.type
+                    }
+                    tmp.add(foo)
+                    return tmp
+                }()
+            }
+
+            def bar = new Bar()
+            assert bar.type == 10
+            assert bar.something*.type == [['String']]
+            assert bar.type == 10
+        '''
     }
 
     void testResolveOwnerFirst() {
@@ -125,7 +150,6 @@ class ClosureResolvingTest extends GroovyTestCase {
         c.resolveStrategy = Closure.DELEGATE_ONLY
         c.delegate = new TestResolve1()
         assertEquals "foo", c.call()
-
     }
 
     void testResolveOwnerOnly() {
@@ -142,7 +166,6 @@ class ClosureResolvingTest extends GroovyTestCase {
         c.resolveStrategy = Closure.OWNER_ONLY
         c.delegate = new TestResolve1()
         assertEquals "stuff", c.call()
-
     }
 
     void testOwnerDelegateChain() {
@@ -179,6 +202,70 @@ class ClosureResolvingTest extends GroovyTestCase {
         cout()
     }
 
+    // GROOVY-7232
+    void testOwnerDelegateChain2() {
+        assertScript '''
+            def outer = { ->
+                def inner = { ->
+                    [x, keySet()]
+                }
+                inner.resolveStrategy = Closure.DELEGATE_ONLY
+                inner.delegate = [x: 1, f: 0]
+                inner.call()
+            }
+            //outer.resolveStrategy = Closure.OWNER_FIRST
+            outer.delegate = [x: 0, g: 0]
+            def result = outer.call()
+
+            assert result.flatten() == [1, 'x', 'f']
+        '''
+    }
+
+    // GROOVY-7232
+    void testOwnerDelegateChain3() {
+        assertScript '''
+            def outer = { ->
+                def inner = { ->
+                    def inner_inner = { ->
+                        [x, keySet()]
+                    }
+                    //inner_inner.resolveStrategy = Closure.OWNER_FIRST
+                    return inner_inner.call()
+                }
+                inner.resolveStrategy = Closure.DELEGATE_ONLY
+                inner.delegate = [x: 1, f: 0]
+                inner()
+            }
+            //outer.resolveStrategy = Closure.OWNER_FIRST
+            outer.delegate = [x: 0, g: 0]
+            def result = outer.call()
+
+            assert result.flatten() == [1, 'x', 'f']
+        '''
+    }
+
+    // GROOVY-7232
+    void testOwnerDelegateChain4() {
+        assertScript '''
+            @GrabResolver(name='grails', root='https://repo.grails.org/grails/core')
+            @Grab('org.grails:grails-web-url-mappings:4.0.1')
+            @GrabExclude('org.codehaus.groovy:*')
+            import grails.web.mapping.*
+
+            def linkGenerator = new LinkGeneratorFactory().create { ->
+                group('/g') { ->
+                    '/bars'(resources: 'bar') { ->
+                        owner.owner.collection { ->                             // TODO: remove qualifier
+                            '/baz'(controller: 'bar', action: 'baz')
+                        }
+                    }
+                }
+            }
+
+            def link = linkGenerator.link(controller: 'bar', action: 'baz', params: [barId: 1])
+            assert link == 'http://localhost/g/bars/1/baz'
+        '''
+    }
 }
 
 class TestResolve1 {
@@ -196,10 +283,9 @@ class TestResolve2 {
 class TestResolve3 {
     def del;
 
-    String toString() {del}
+    String toString() { del }
 
     def whoisThis() { return this }
 
     def met() { return "I'm the method inside '" + del + "'" }
 }
-

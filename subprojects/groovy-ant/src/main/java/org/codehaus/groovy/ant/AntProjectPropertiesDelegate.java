@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.ant;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import org.apache.tools.ant.Project;
 
 import java.util.Collection;
@@ -26,90 +27,110 @@ import java.util.Hashtable;
 import java.util.Map;
 import java.util.Set;
 
-public class AntProjectPropertiesDelegate extends Hashtable {
+public class AntProjectPropertiesDelegate extends Hashtable<String, Object> {
 
-    private final Project project;
+    private transient final Project project;
+
+    private static final long serialVersionUID = -8311751517184349962L;
 
     public AntProjectPropertiesDelegate(Project project) {
         super();
         this.project = project;
     }
 
+    public AntProjectPropertiesDelegate(Map<? extends String, ?> t) {
+        super(t);
+        project = null;
+    }
+
+    @Override
     public synchronized int hashCode() {
         return project.getProperties().hashCode();
     }
 
+    @Override
     public synchronized int size() {
         return project.getProperties().size();
     }
 
     /**
      * @throws UnsupportedOperationException is always thrown when this method is invoked. The Project properties are immutable.
-     */    
+     */
+    @Override
     public synchronized void clear() {
         throw new UnsupportedOperationException("Impossible to clear the project properties.");
     }
 
+    @Override
     public synchronized boolean isEmpty() {
         return project.getProperties().isEmpty();
     }
 
+    @Override
+    @SuppressFBWarnings(value = "CN_IDIOM_NO_SUPER_CALL", justification = "Okay for our use case. The cloned delegate should have the correct type.")
     public synchronized Object clone() {
         return project.getProperties().clone();
     }
 
+    @Override
+    @SuppressWarnings("HashtableContains")
     public synchronized boolean contains(Object value) {
         return project.getProperties().contains(value);
     }
 
+    @Override
     public synchronized boolean containsKey(Object key) {
         return project.getProperties().containsKey(key);
     }
 
+    @Override
     public boolean containsValue(Object value) {
         return project.getProperties().containsValue(value);
     }
 
+    @Override
     public synchronized boolean equals(Object o) {
         return project.getProperties().equals(o);
     }
 
+    @Override
     public synchronized String toString() {
         return project.getProperties().toString();
     }
 
-    public Collection values() {
+    @Override
+    public Collection<Object> values() {
         return project.getProperties().values();
     }
 
-    public synchronized Enumeration elements() {
+    @Override
+    public synchronized Enumeration<Object> elements() {
         return project.getProperties().elements();
     }
 
-    public synchronized Enumeration keys() {
+    @Override
+    public synchronized Enumeration<String> keys() {
         return project.getProperties().keys();
     }
 
-    public AntProjectPropertiesDelegate(Map t) {
-        super(t);
-        project = null;
-    }
-
-    public synchronized void putAll(Map t) {
-        for (Object e : t.entrySet()) {
-            Map.Entry entry = (Map.Entry) e;
+    @Override
+    public synchronized void putAll(Map<? extends String, ?> t) {
+        for (Map.Entry<? extends String, ?> entry : t.entrySet()) {
             put(entry.getKey(), entry.getValue());
         }
     }
 
-    public Set entrySet() {
+    @Override
+    public Set<Map.Entry<String, Object>> entrySet() {
         return project.getProperties().entrySet();
     }
 
-    public Set keySet() {
+    @Override
+    public Set<String> keySet() {
         return project.getProperties().keySet();
     }
 
+    @Override
     public synchronized Object get(Object key) {
         return project.getProperties().get(key);
     }
@@ -117,16 +138,18 @@ public class AntProjectPropertiesDelegate extends Hashtable {
     /**
      * @throws UnsupportedOperationException is always thrown when this method is invoked. The Project properties are immutable.
      */
+    @Override
     public synchronized Object remove(Object key) {
         throw new UnsupportedOperationException("Impossible to remove a property from the project properties.");
     }
 
-    public synchronized Object put(Object key, Object value) {
+    @Override
+    public synchronized Object put(String key, Object value) {
         Object oldValue = null;
         if (containsKey(key)) {
             oldValue = get(key);
         }
-        project.setProperty(key.toString(), value.toString());
+        project.setProperty(key, value.toString());
         return oldValue;
     }
 }

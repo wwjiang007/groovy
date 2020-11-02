@@ -55,6 +55,7 @@ public class InheritConstructorsASTTransformation extends AbstractASTTransformat
     private static final ClassNode INHERIT_CONSTRUCTORS_TYPE = make(InheritConstructors.class);
     private static final String ANNOTATION = "@" + INHERIT_CONSTRUCTORS_TYPE.getNameWithoutPackage();
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotationNode anno = (AnnotationNode) nodes[0];
@@ -96,7 +97,7 @@ public class InheritConstructorsASTTransformation extends AbstractASTTransformat
         if (isExisting(classNode, params)) return;
         ConstructorNode added = addGeneratedConstructor(classNode, consNode.getModifiers(), params, consNode.getExceptions(), block(ctorSuperS(args(theArgs))));
         if (copyConstructorAnnotations) {
-            added.addAnnotations(copyAnnotatedNodeAnnotations(consNode, ANNOTATION));
+            added.addAnnotations(copyAnnotatedNodeAnnotations(consNode, ANNOTATION, false));
         }
     }
 

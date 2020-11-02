@@ -18,17 +18,35 @@
  */
 package groovy.console.ui.text;
 
-import javax.swing.*;
+import groovy.lang.Tuple;
+
+import javax.swing.AbstractAction;
+import javax.swing.Action;
+import javax.swing.ActionMap;
+import javax.swing.InputMap;
+import javax.swing.JTextPane;
+import javax.swing.KeyStroke;
+import javax.swing.SwingUtilities;
 import javax.swing.plaf.ComponentUI;
 import javax.swing.text.BadLocationException;
 import javax.swing.text.Caret;
 import javax.swing.text.DefaultCaret;
 import javax.swing.text.DefaultEditorKit;
+import javax.swing.text.DefaultStyledDocument;
 import javax.swing.text.Document;
+import javax.swing.text.DocumentFilter;
 import javax.swing.text.Element;
 import javax.swing.text.JTextComponent;
 import javax.swing.text.Utilities;
-import java.awt.*;
+import java.awt.Color;
+import java.awt.Component;
+import java.awt.Cursor;
+import java.awt.Dimension;
+import java.awt.Font;
+import java.awt.FontMetrics;
+import java.awt.Graphics;
+import java.awt.Graphics2D;
+import java.awt.Rectangle;
 import java.awt.event.ActionEvent;
 import java.awt.event.KeyEvent;
 import java.awt.event.MouseAdapter;
@@ -79,6 +97,7 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
             new MouseAdapter() {
                 Cursor cursor;
 
+                @Override
                 public void mouseEntered(MouseEvent me) {
                     if (contains(me.getPoint())) {
                         cursor = getCursor();
@@ -89,6 +108,7 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
                     }
                 }
 
+                @Override
                 public void mouseExited(MouseEvent me) {
                     getRootPane().getLayeredPane().setCursor(null);
                 }
@@ -189,26 +209,31 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
         overtypeCaret.setBlinkRate(defaultCaret.getBlinkRate());
     }
 
+    @Override
     public void addNotify() {
         super.addNotify();
         addMouseListener(mouseAdapter);
         FindReplaceUtility.registerTextComponent(this);
     }
 
+    @Override
     public int getNumberOfPages() {
         Paper paper = PAGE_FORMAT.getPaper();
         numPages = (int) Math.ceil(getSize().getHeight() / paper.getImageableHeight());
         return numPages;
     }
 
+    @Override
     public PageFormat getPageFormat(int pageIndex) throws IndexOutOfBoundsException {
         return PAGE_FORMAT;
     }
 
+    @Override
     public Printable getPrintable(int param) throws IndexOutOfBoundsException {
         return this;
     }
 
+    @Override
     public int print(Graphics graphics, PageFormat pageFormat, int page)
             throws PrinterException {
         if (page < numPages) {
@@ -272,6 +297,7 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
         return Printable.NO_SUCH_PAGE;
     }
 
+    @Override
     public boolean getScrollableTracksViewportWidth() {
         boolean bool = super.getScrollableTracksViewportWidth();
         if (unwrapped) {
@@ -313,6 +339,7 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
         return unwrapped;
     }
 
+    @Override
     protected void processKeyEvent(KeyEvent e) {
         super.processKeyEvent(e);
 
@@ -326,12 +353,14 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
         }
     }
 
+    @Override
     public void removeNotify() {
         super.removeNotify();
         removeMouseListener(mouseAdapter);
         FindReplaceUtility.unregisterTextComponent(this);
     }
 
+    @Override
     public void replaceSelection(String text) {
         //  Implement overtype mode by selecting the character at the current
         //  caret position
@@ -344,6 +373,7 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
         super.replaceSelection(text);
     }
 
+    @Override
     public void setBounds(int x, int y, int width, int height) {
         if (unwrapped) {
             Dimension size = this.getPreferredSize();
@@ -389,18 +419,21 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
     }
 
     private static class FindAction extends AbstractAction {
+        @Override
         public void actionPerformed(ActionEvent ae) {
             FindReplaceUtility.showDialog();
         }
     }
 
     private static class ReplaceAction extends AbstractAction {
+        @Override
         public void actionPerformed(ActionEvent ae) {
             FindReplaceUtility.showDialog(true);
         }
     }
 
     private class ShiftTabAction extends AbstractAction {
+        @Override
         public void actionPerformed(ActionEvent ae) {
             try {
                 if (multiLineTab && TextEditor.this.getSelectedText() != null) {
@@ -416,9 +449,10 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
                             TAB_BACK_PATTERN.matcher(getSelectedText()).replaceAll("") :
                             getSelectedText().replaceAll("^\t", "");
 
+                    int stop = start + text.length();
+                    setRenderRange(start, stop);
                     TextEditor.this.replaceSelection(text);
-
-                    TextEditor.this.select(start, start + text.length());
+                    TextEditor.this.select(start, stop);
                 }
             } catch (Exception e) {
                 e.printStackTrace();
@@ -427,6 +461,7 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
     }
 
     private class TabAction extends AbstractAction {
+        @Override
         public void actionPerformed(ActionEvent ae) {
             try {
                 Document doc = TextEditor.this.getDocument();
@@ -441,8 +476,11 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
 
                     String toReplace = TextEditor.this.getSelectedText();
                     toReplace = LINE_START.matcher(toReplace).replaceAll(text);
+
+                    int stop = start + toReplace.length();
+                    setRenderRange(start, stop);
                     TextEditor.this.replaceSelection(toReplace);
-                    TextEditor.this.select(start, start + toReplace.length());
+                    TextEditor.this.select(start, stop);
                 } else {
                     int pos = TextEditor.this.getCaretPosition();
                     doc.insertString(pos, text, null);
@@ -453,12 +491,21 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
         }
     }
 
+    private void setRenderRange(int start, int stop) {
+        DocumentFilter documentFilter = ((DefaultStyledDocument) TextEditor.this.getDocument()).getDocumentFilter();
+        if (documentFilter instanceof SmartDocumentFilter) {
+            SmartDocumentFilter smartDocumentFilter = (SmartDocumentFilter) documentFilter;
+            smartDocumentFilter.setRenderRange(Tuple.tuple(start, stop));
+        }
+    }
+
     /**
      * Paint a horizontal line the width of a column and 1 pixel high
      */
     private static class OvertypeCaret extends DefaultCaret {
         //The overtype caret will simply be a horizontal line one pixel high
         // (once we determine where to paint it)
+        @Override
         public void paint(Graphics g) {
             if (isVisible()) {
                 try {
@@ -484,6 +531,7 @@ public class TextEditor extends JTextPane implements Pageable, Printable {
          *  (The damaged area is the area the caret is painted in. We must
          *  consider the area for the default caret and this caret)
          */
+        @Override
         protected synchronized void damage(Rectangle r) {
             if (r != null) {
                 JTextComponent component = getComponent();

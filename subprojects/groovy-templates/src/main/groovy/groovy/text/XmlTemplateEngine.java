@@ -41,6 +41,7 @@ import java.io.Writer;
 import java.lang.ref.WeakReference;
 import java.util.HashMap;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 /**
  * Template engine for use in templating scenarios where both the template
@@ -104,7 +105,7 @@ import java.util.Map;
  */
 public class XmlTemplateEngine extends TemplateEngine {
 
-    private static int counter = 1;
+    private static AtomicInteger counter = new AtomicInteger(0);
 
     private static class GspPrinter extends XmlNodePrinter {
 
@@ -134,6 +135,7 @@ public class XmlTemplateEngine extends TemplateEngine {
             throw new RuntimeException("Unsupported 'gsp:' tag named \"" + tag + "\".");
         }
 
+        @Override
         protected void printSimpleItem(Object value) {
             this.printLineBegin();
             out.print(escapeSpecialChars(InvokerHelper.toString(value)));
@@ -181,11 +183,13 @@ public class XmlTemplateEngine extends TemplateEngine {
             }
         }
 
+        @Override
         protected void printLineBegin() {
             out.print("out.print(\"\"\"");
             out.printIndent();
         }
 
+        @Override
         protected void printLineEnd(String comment) {
             out.print("\\n\"\"\");");
             if (comment != null) {
@@ -195,6 +199,7 @@ public class XmlTemplateEngine extends TemplateEngine {
             out.print("\n");
         }
 
+        @Override
         protected boolean printSpecialNode(Node node) {
             Object name = node.name();
             if (name instanceof QName) {
@@ -221,10 +226,12 @@ public class XmlTemplateEngine extends TemplateEngine {
             this.script = script;
         }
 
+        @Override
         public Writable make() {
             return make(new HashMap());
         }
 
+        @Override
         public Writable make(Map map) {
             if (map == null) {
                 throw new IllegalArgumentException("map must not be null");
@@ -245,6 +252,7 @@ public class XmlTemplateEngine extends TemplateEngine {
             this.result = new WeakReference<>(null);
         }
 
+        @Override
         public Writer writeTo(Writer out) {
             Script scriptObject = InvokerHelper.createScript(script.getClass(), binding);
             PrintWriter pw = new PrintWriter(out);
@@ -254,9 +262,11 @@ public class XmlTemplateEngine extends TemplateEngine {
             return out;
         }
 
+        @Override
         public String toString() {
-            if (result.get() != null) {
-                return result.get().toString();
+            Object o = result.get();
+            if (o != null) {
+                return o.toString();
             }
             String string = writeTo(new StringBuilderWriter(1024)).toString();
             result = new WeakReference<>(string);
@@ -290,6 +300,7 @@ public class XmlTemplateEngine extends TemplateEngine {
         setIndentation(DEFAULT_INDENTATION);
     }
 
+    @Override
     public Template createTemplate(Reader reader) throws CompilationFailedException, ClassNotFoundException, IOException {
         Node root ;
         try {
@@ -308,7 +319,7 @@ public class XmlTemplateEngine extends TemplateEngine {
 
         Script script;
         try {
-            script = groovyShell.parse(writer.toString(), "XmlTemplateScript" + counter++ + ".groovy");
+            script = groovyShell.parse(writer.toString(), "XmlTemplateScript" + counter.incrementAndGet() + ".groovy");
         } catch (Exception e) {
             throw new GroovyRuntimeException("Failed to parse template script (your template may contain an error or be trying to use expressions not currently supported): " + e.getMessage());
         }
@@ -326,6 +337,7 @@ public class XmlTemplateEngine extends TemplateEngine {
         this.indentation = indentation;
     }
 
+    @Override
     public String toString() {
         return "XmlTemplateEngine";
     }

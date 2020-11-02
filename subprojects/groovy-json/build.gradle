@@ -16,14 +16,26 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-dependencies {
-    implementation rootProject
-    testImplementation project(':groovy-test')
-    testImplementation project(':groovy-dateutil')
-    testRuntime "org.slf4j:slf4j-api:$slf4jVersion"
-    testRuntime project(':groovy-ant') // for JavadocAssertionTests
+plugins {
+    id 'org.apache.groovy-library'
 }
 
-eclipse.classpath.file.whenMerged {
-    entries.removeAll { entry -> entry.path in ['/groovy-ant', '/groovy-groovydoc'] }
+dependencies {
+    api rootProject  // JsonBuilder extends GroovyObjectSupport...
+    testImplementation project(':groovy-test')
+    testImplementation project(':groovy-dateutil')
+    testRuntimeOnly "org.slf4j:slf4j-api:${versions.slf4j}"
+    testRuntimeOnly project(':groovy-ant') // for JavadocAssertionTests
+    testRuntimeOnly(project(':')) {
+        because "Tests are using Grapes"
+        capabilities {
+            requireCapability("org.apache.groovy:groovy-grapes")
+        }
+    }
+}
+
+plugins.withId('eclipse') {
+    eclipse.classpath.file.whenMerged {
+        entries.removeAll { entry -> entry.path in ['/groovy-ant', '/groovy-groovydoc'] }
+    }
 }

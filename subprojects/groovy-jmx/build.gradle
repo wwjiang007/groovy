@@ -16,9 +16,15 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-dependencies {
-    implementation rootProject
-    testImplementation project(':groovy-test')
+plugins {
+    id 'org.apache.groovy-library'
 }
 
-compileTestGroovy.classpath += rootProject.sourceSets.test.output
+dependencies {
+    api rootProject // JmxBuilder extends FactoryBuilderSupport...
+    testImplementation project(':groovy-test')
+    testRuntimeOnly("org.apache.ivy:ivy:${versions.ivy}") {
+        transitive = false
+    }
+    testRuntimeOnly project(":groovy-swing")
+}

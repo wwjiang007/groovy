@@ -130,6 +130,7 @@ public class QName implements Serializable {
      *
      * @return  a string representation of the QName
      */
+    @Override
     public String toString() {
         return ((namespaceURI.equals(EMPTY_STRING))
                 ? localPart
@@ -167,6 +168,7 @@ public class QName implements Serializable {
      * @return <code>true</code> if the given object is identical to this
      *      QName: <code>false</code> otherwise.
      */
+    @Override
     public boolean equals(Object o) {
         if (this == o) return true;
         if (o == null) return false;
@@ -178,7 +180,7 @@ public class QName implements Serializable {
         } else if (o instanceof String) {
             final String string = (String)o;
             if (string.length() == 0) return false;
-            int lastColonIndex = string.lastIndexOf(":");
+            int lastColonIndex = string.lastIndexOf(':');
             if (lastColonIndex < 0 || lastColonIndex == string.length() - 1) return false;
             final String stringPrefix = string.substring(0,lastColonIndex);
             final String stringLocalPart = string.substring(lastColonIndex + 1);
@@ -219,7 +221,7 @@ public class QName implements Serializable {
             final String string = (String)o;
             if (string.length() == 0) return false;
             // try matching against 'prefix:localname'
-            int lastColonIndex = string.lastIndexOf(":");
+            int lastColonIndex = string.lastIndexOf(':');
             if (lastColonIndex < 0 && prefix.length() == 0) return string.equals(localPart);
             if (lastColonIndex < 0 || lastColonIndex == string.length() - 1) return false;
             final String stringPrefix = string.substring(0,lastColonIndex);
@@ -249,7 +251,7 @@ public class QName implements Serializable {
      */
     public static QName valueOf(String s) {
 
-        if ((s == null) || s.equals("")) {
+        if ((s == null) || s.isEmpty()) {
             throw new IllegalArgumentException("invalid QName literal");
         }
 
@@ -278,6 +280,7 @@ public class QName implements Serializable {
      *
      * @return a hash code value for this Qname object
      */
+    @Override
     public int hashCode() {
         int result;
         result = namespaceURI.hashCode();

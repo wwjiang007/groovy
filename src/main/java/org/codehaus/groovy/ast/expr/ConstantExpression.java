@@ -22,7 +22,7 @@ import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.GroovyCodeVisitor;
 
 /**
- * Represents a constant expression such as null, true, false
+ * Represents a constant expression such as null, true, false.
  */
 public class ConstantExpression extends Expression {
     // The following fields are only used internally; every occurrence of a user-defined expression of the same kind
@@ -72,14 +72,17 @@ public class ConstantExpression extends Expression {
         }
     }
 
+    @Override
     public String toString() {
         return super.toString() + "[" + value + "]";
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitConstantExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         return this;
     }
@@ -91,8 +94,9 @@ public class ConstantExpression extends Expression {
         return value;
     }
 
+    @Override
     public String getText() {
-        return value == null ? "null" : value.toString();
+        return (value == null ? "null" : value.toString());
     }
 
     public String getConstantName() {

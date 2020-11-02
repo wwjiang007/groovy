@@ -33,7 +33,7 @@ import org.codehaus.groovy.runtime.ScriptBytecodeAdapter;
 public class StaticMetaMethodSite extends MetaMethodSite {
     private final int version;
 
-    public StaticMetaMethodSite(CallSite site, MetaClassImpl metaClass, MetaMethod metaMethod, Class params[]) {
+    public StaticMetaMethodSite(CallSite site, MetaClassImpl metaClass, MetaMethod metaMethod, Class[] params) {
         super(site, metaClass, metaMethod, params);
         version = metaClass.getVersion ();
     }
@@ -83,6 +83,7 @@ public class StaticMetaMethodSite extends MetaMethodSite {
            && MetaClassHelper.sameClasses(params, arg1, arg2, arg3, arg4);
     }
 
+    @Override
     public Object call(Object receiver, Object[] args) throws Throwable {
         if(checkCall(receiver, args)) {
             try {
@@ -95,6 +96,7 @@ public class StaticMetaMethodSite extends MetaMethodSite {
         }
     }
 
+    @Override
     public Object callStatic(Class receiver, Object[] args) throws Throwable {
         if(checkCall(receiver, args))
           return invoke(receiver, args);
@@ -122,10 +124,11 @@ public class StaticMetaMethodSite extends MetaMethodSite {
      */
     public static class StaticMetaMethodSiteNoUnwrap extends StaticMetaMethodSite {
 
-        public StaticMetaMethodSiteNoUnwrap(CallSite site, MetaClassImpl metaClass, MetaMethod metaMethod, Class params[]) {
+        public StaticMetaMethodSiteNoUnwrap(CallSite site, MetaClassImpl metaClass, MetaMethod metaMethod, Class[] params) {
             super(site, metaClass, metaMethod, params);
         }
 
+        @Override
         public final Object invoke(Object receiver, Object[] args) throws Throwable {
             try {
                 return metaMethod.doMethodInvoke(receiver,  args);
@@ -140,10 +143,11 @@ public class StaticMetaMethodSite extends MetaMethodSite {
      */
     public static class StaticMetaMethodSiteNoUnwrapNoCoerce extends StaticMetaMethodSite {
 
-        public StaticMetaMethodSiteNoUnwrapNoCoerce(CallSite site, MetaClassImpl metaClass, MetaMethod metaMethod, Class params[]) {
+        public StaticMetaMethodSiteNoUnwrapNoCoerce(CallSite site, MetaClassImpl metaClass, MetaMethod metaMethod, Class[] params) {
             super(site, metaClass, metaMethod, params);
         }
 
+        @Override
         public final Object invoke(Object receiver, Object[] args) throws Throwable {
             try {
                 return metaMethod.invoke(receiver,  args);

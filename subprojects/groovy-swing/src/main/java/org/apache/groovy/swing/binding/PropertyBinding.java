@@ -27,8 +27,8 @@ import org.codehaus.groovy.runtime.InvokerInvocationException;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
 import org.codehaus.groovy.runtime.typehandling.DefaultTypeTransformation;
 
-import javax.swing.*;
-import java.awt.*;
+import javax.swing.SwingUtilities;
+import java.awt.Component;
 import java.beans.PropertyChangeEvent;
 import java.beans.PropertyChangeListener;
 import java.beans.PropertyVetoException;
@@ -44,14 +44,13 @@ import java.util.concurrent.Executors;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
-
 /**
  * @since Groovy 1.1
  */
 public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBinding {
     private static final ExecutorService DEFAULT_EXECUTOR_SERVICE = Executors.newFixedThreadPool(Runtime.getRuntime().availableProcessors());
     private static final Logger LOG = Logger.getLogger(PropertyBinding.class.getName());
-    private static final Map<Class, Class<? extends PropertyAccessor>> ACCESSORS = new LinkedHashMap<Class, Class<? extends PropertyAccessor>>();
+    private static final Map<Class<?>, Class<? extends PropertyAccessor>> ACCESSORS = new LinkedHashMap<>();
     private static final Object[] EMPTY_OBJECT_ARRAY = new Object[0];
 
     static {
@@ -72,10 +71,10 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
         for (String line : lines) {
             line = line.trim();
             if (line.startsWith("#")) return;
-            String[] parts = line.split("=");
+            String[] parts = line.split("=", -1);
             if (parts.length == 2) {
                 try {
-                    ACCESSORS.put(cl.loadClass(parts[0].trim()), (Class<? extends PropertyAccessor>) cl.loadClass(parts[1].trim()));
+                    ACCESSORS.put(cl.loadClass(parts[0].trim()), getaAccessorClass(cl, parts[1]));
                 } catch (ClassNotFoundException e) {
                     // ignore
                     // TODO should use a low priority logger
@@ -85,15 +84,22 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
         }
     }
 
+    @SuppressWarnings("unchecked")
+    private static Class<? extends PropertyAccessor> getaAccessorClass(ClassLoader cl, String part) throws ClassNotFoundException {
+        return (Class<? extends PropertyAccessor>) cl.loadClass(part.trim());
+    }
+
     private static Enumeration<URL> fetchUrlsFor(String path) {
         try {
             return Thread.currentThread().getContextClassLoader().getResources(path);
         } catch (IOException e) {
             return new Enumeration<URL>() {
+                @Override
                 public boolean hasMoreElements() {
                     return false;
                 }
 
+                @Override
                 public URL nextElement() {
                     return null;
                 }
@@ -138,14 +144,14 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
         }
     }
 
-    private PropertyAccessor fetchPropertyAccessor(Class klass) {
+    private PropertyAccessor fetchPropertyAccessor(Class<?> klass) {
         if (klass == null) {
             return DefaultPropertyAccessor.INSTANCE;
         }
 
         Class<? extends PropertyAccessor> accessorClass = ACCESSORS.get(klass);
         if (accessorClass == null) {
-            for (Class c : klass.getInterfaces()) {
+            for (Class<?> c : klass.getInterfaces()) {
                 PropertyAccessor propertyAccessor = fetchPropertyAccessor(c);
                 if (propertyAccessor != DefaultPropertyAccessor.INSTANCE) {
                     return propertyAccessor;
@@ -174,8 +180,10 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
         return UpdateStrategy.SAME;
     }
 
+    @Override
     public void updateTargetValue(final Object newValue) {
         Runnable runnable = new Runnable() {
+            @Override
             public void run() {
                 Object sourceValue = getSourceValue();
                 // if (isNonChangeCheck()) {
@@ -253,10 +261,12 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
         }
     }
 
+    @Override
     public Object getSourceValue() {
         return propertyAccessor().read(bean, propertyName);
     }
 
+    @Override
     public FullBinding createBinding(SourceBinding source, TargetBinding target) {
         return new PropertyFullBinding(source, target);
     }
@@ -273,12 +283,14 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
             setTargetBinding(target);
         }
 
+        @Override
         public void propertyChange(PropertyChangeEvent event) {
             if (boundToProperty || event.getPropertyName().equals(boundProperty)) {
                 update();
             }
         }
 
+        @Override
         public void bind() {
             if (!bound) {
                 bound = true;
@@ -298,6 +310,7 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
             }
         }
 
+        @Override
         public void unbind() {
             if (bound) {
                 if (boundToProperty) {
@@ -319,6 +332,7 @@ public class PropertyBinding implements SourceBinding, TargetBinding, TriggerBin
             }
         }
 
+        @Override
         public void rebind() {
             if (bound) {
                 unbind();

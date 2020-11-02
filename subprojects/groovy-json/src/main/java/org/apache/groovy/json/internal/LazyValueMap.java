@@ -69,11 +69,13 @@ public class LazyValueMap extends AbstractMap<String, Object> implements ValueMa
      */
     boolean mapChopped = false;
 
+    @SuppressWarnings("unchecked")
     public LazyValueMap(boolean lazyChop) {
         this.items = new Entry[5];
         this.lazyChop = lazyChop;
     }
 
+    @SuppressWarnings("unchecked")
     public LazyValueMap(boolean lazyChop, int initialSize) {
         this.items = new Entry[initialSize];
         this.lazyChop = lazyChop;
@@ -84,6 +86,7 @@ public class LazyValueMap extends AbstractMap<String, Object> implements ValueMa
      *
      * @param miv miv we are adding.
      */
+    @Override
     public final void add(MapItemValue miv) {
         if (len >= items.length) {
             items = LazyMap.grow(items);
@@ -98,6 +101,7 @@ public class LazyValueMap extends AbstractMap<String, Object> implements ValueMa
      * @param key to lookup
      * @return the item for the given key
      */
+    @Override
     public final Object get(Object key) {
         Object object = null;
 
@@ -185,11 +189,13 @@ public class LazyValueMap extends AbstractMap<String, Object> implements ValueMa
         }
     }
 
+    @Override
     public Value put(String key, Object value) {
         die("Not that kind of map");
         return null;
     }
 
+    @Override
     public Set<Entry<String, Object>> entrySet() {
         if (map == null) {
             buildMap();
@@ -216,29 +222,35 @@ public class LazyValueMap extends AbstractMap<String, Object> implements ValueMa
         items = null;
     }
 
+    @Override
     public Collection<Object> values() {
         if (map == null) buildMap();
         return map.values();
     }
 
+    @Override
     public int size() {
         if (map == null) buildMap();
         return map.size();
     }
 
+    @Override
     public String toString() {
         if (map == null) buildMap();
         return map.toString();
     }
 
+    @Override
     public int len() {
         return len;
     }
 
+    @Override
     public boolean hydrated() {
         return map != null;
     }
 
+    @Override
     public Entry<String, Value>[] items() {
         return items;
     }

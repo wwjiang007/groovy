@@ -38,9 +38,7 @@ import org.codehaus.groovy.ast.tools.BeanUtils;
 import org.codehaus.groovy.ast.tools.GeneralUtils;
 import org.codehaus.groovy.ast.tools.GenericsUtils;
 import org.codehaus.groovy.control.SourceUnit;
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
 import org.codehaus.groovy.runtime.StringGroovyMethods;
-import org.codehaus.groovy.syntax.SyntaxException;
 import org.objectweb.asm.Opcodes;
 
 import java.lang.annotation.Retention;
@@ -55,7 +53,7 @@ import static groovy.transform.Undefined.isUndefined;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getInstanceNonPropertyFieldNames;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getSuperNonPropertyFields;
 
-public abstract class AbstractASTTransformation implements Opcodes, ASTTransformation, ErrorCollecting {
+public abstract class AbstractASTTransformation implements ASTTransformation, ErrorCollecting {
     public static final ClassNode RETENTION_CLASSNODE = ClassHelper.makeWithoutCaching(Retention.class);
 
     protected SourceUnit sourceUnit;
@@ -67,9 +65,19 @@ public abstract class AbstractASTTransformation implements Opcodes, ASTTransform
      * Annotations with {@link org.codehaus.groovy.runtime.GeneratedClosure} members are not supported for now.
      */
     protected List<AnnotationNode> copyAnnotatedNodeAnnotations(final AnnotatedNode annotatedNode, String myTypeName) {
+        return copyAnnotatedNodeAnnotations(annotatedNode, myTypeName, true);
+    }
+
+    /**
+     * Copies all <tt>candidateAnnotations</tt> with retention policy {@link java.lang.annotation.RetentionPolicy#RUNTIME}
+     * and {@link java.lang.annotation.RetentionPolicy#CLASS}.
+     * <p>
+     * Annotations with {@link org.codehaus.groovy.runtime.GeneratedClosure} members are not supported for now.
+     */
+    protected List<AnnotationNode> copyAnnotatedNodeAnnotations(final AnnotatedNode annotatedNode, String myTypeName, boolean includeGenerated) {
         final List<AnnotationNode> copiedAnnotations = new ArrayList<>();
         final List<AnnotationNode> notCopied = new ArrayList<>();
-        GeneralUtils.copyAnnotatedNodeAnnotations(annotatedNode, copiedAnnotations, notCopied);
+        GeneralUtils.copyAnnotatedNodeAnnotations(annotatedNode, copiedAnnotations, notCopied, includeGenerated);
         for (AnnotationNode annotation : notCopied) {
             addError(myTypeName + " does not support keeping Closure annotation members.", annotation);
         }
@@ -216,12 +224,9 @@ public abstract class AbstractASTTransformation implements Opcodes, ASTTransform
         return list;
     }
 
+    @Override
     public void addError(String msg, ASTNode expr) {
-        sourceUnit.getErrorCollector().addErrorAndContinue(new SyntaxErrorMessage(
-                        new SyntaxException(msg + '\n', expr.getLineNumber(), expr.getColumnNumber(),
-                                expr.getLastLineNumber(), expr.getLastColumnNumber()),
-                        sourceUnit)
-        );
+        sourceUnit.getErrorCollector().addErrorAndContinue(msg + '\n', expr, sourceUnit);
     }
 
     protected boolean checkNotInterface(ClassNode cNode, String annotationName) {

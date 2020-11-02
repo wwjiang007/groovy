@@ -29,13 +29,14 @@ import java.io.InputStreamReader;
 import java.io.Reader;
 import java.net.URI;
 import java.nio.charset.Charset;
+import java.nio.charset.StandardCharsets;
 
 /**
  *  A ReaderSource for source files.
  */
 public class FileReaderSource extends AbstractReaderSource {
     private final File file;  // The File from which we produce Readers.
-    private final Charset UTF8 = Charset.forName("UTF-8");
+    private final Charset UTF8 = StandardCharsets.UTF_8;
 
    /**
     *  Creates the ReaderSource from a File descriptor.
@@ -54,6 +55,7 @@ public class FileReaderSource extends AbstractReaderSource {
     /**
     *  Returns a new Reader on the underlying source object.  
     */
+    @Override
     public Reader getReader() throws IOException {
        // we want to remove the BOM windows adds from a file if the encoding is UTF-8
        // in other cases we depend on the charsets 
@@ -82,6 +84,7 @@ public class FileReaderSource extends AbstractReaderSource {
      *
      * @return URI for the file of this source.
      */
+    @Override
     public URI getURI() {
         return file.toURI();
     }

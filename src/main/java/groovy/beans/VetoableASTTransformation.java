@@ -34,8 +34,6 @@ import org.codehaus.groovy.ast.tools.PropertyNodeUtils;
 import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.control.messages.SimpleMessage;
-import org.codehaus.groovy.control.messages.SyntaxErrorMessage;
-import org.codehaus.groovy.syntax.SyntaxException;
 import org.codehaus.groovy.transform.GroovyASTTransformation;
 import org.objectweb.asm.Opcodes;
 
@@ -44,7 +42,6 @@ import java.beans.VetoableChangeListener;
 import java.beans.VetoableChangeSupport;
 
 import static org.apache.groovy.ast.tools.ClassNodeUtils.addGeneratedMethod;
-import static org.apache.groovy.util.BeanUtils.capitalize;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.args;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.assignS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.callThisX;
@@ -100,6 +97,7 @@ public class VetoableASTTransformation extends BindableASTTransformation {
      * @param nodes   the AST nodes
      * @param source  the source unit for the nodes
      */
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         if (!(nodes[0] instanceof AnnotationNode) || !(nodes[1] instanceof AnnotatedNode)) {
             throw new RuntimeException("Internal error: wrong types: $node.class / $parent.class");
@@ -110,10 +108,7 @@ public class VetoableASTTransformation extends BindableASTTransformation {
             addListenerToClass(source, (ClassNode) nodes[1]);
         } else {
             if ((((FieldNode)nodes[1]).getModifiers() & Opcodes.ACC_FINAL) != 0) {
-                source.getErrorCollector().addErrorAndContinue(new SyntaxErrorMessage(
-                        new SyntaxException("@groovy.beans.Vetoable cannot annotate a final property.",
-                                node.getLineNumber(), node.getColumnNumber(), node.getLastLineNumber(), node.getLastColumnNumber()),
-                        source));
+                source.getErrorCollector().addErrorAndContinue("@groovy.beans.Vetoable cannot annotate a final property.", node, source);
             }
 
             addListenerToProperty(source, node, (AnnotatedNode) nodes[1]);
@@ -131,10 +126,7 @@ public class VetoableASTTransformation extends BindableASTTransformation {
             if (propertyNode.getName().equals(fieldName)) {
                 if (field.isStatic()) {
                     //noinspection ThrowableInstanceNeverThrown
-                    source.getErrorCollector().addErrorAndContinue(new SyntaxErrorMessage(
-                            new SyntaxException("@groovy.beans.Vetoable cannot annotate a static property.",
-                                    node.getLineNumber(), node.getColumnNumber(), node.getLastLineNumber(), node.getLastColumnNumber()),
-                            source));
+                    source.getErrorCollector().addErrorAndContinue("@groovy.beans.Vetoable cannot annotate a static property.", node, source);
                 } else {
                     createListenerSetter(source, bindable, declaringClass, propertyNode);
                 }
@@ -142,10 +134,7 @@ public class VetoableASTTransformation extends BindableASTTransformation {
             }
         }
         //noinspection ThrowableInstanceNeverThrown
-        source.getErrorCollector().addErrorAndContinue(new SyntaxErrorMessage(
-                new SyntaxException("@groovy.beans.Vetoable must be on a property, not a field.  Try removing the private, protected, or public modifier.",
-                        node.getLineNumber(), node.getColumnNumber(), node.getLastLineNumber(), node.getLastColumnNumber()),
-                source));
+        source.getErrorCollector().addErrorAndContinue("@groovy.beans.Vetoable must be on a property, not a field.  Try removing the private, protected, or public modifier.", node, source);
     }
 
 
@@ -166,9 +155,10 @@ public class VetoableASTTransformation extends BindableASTTransformation {
     /**
      * Wrap an existing setter.
      */
-    private static void wrapSetterMethod(ClassNode classNode, boolean bindable, String propertyName) {
-        String getterName = "get" + capitalize(propertyName);
-        MethodNode setter = classNode.getSetterMethod("set" + capitalize(propertyName));
+    private static void wrapSetterMethod(ClassNode classNode, boolean bindable, PropertyNode propertyNode) {
+        String getterName = propertyNode.getGetterNameOrDefault();
+        String propertyName = propertyNode.getName();
+        MethodNode setter = classNode.getSetterMethod(propertyNode.getSetterNameOrDefault());
 
         if (setter != null) {
             // Get the existing code block
@@ -209,7 +199,7 @@ public class VetoableASTTransformation extends BindableASTTransformation {
         if (needsVetoableChangeSupport(declaringClass, source)) {
             addVetoableChangeSupport(declaringClass);
         }
-        String setterName = "set" + capitalize(propertyNode.getName());
+        String setterName = propertyNode.getSetterNameOrDefault();
         if (declaringClass.getMethods(setterName).isEmpty()) {
             Expression fieldExpression = fieldX(propertyNode.getField());
             BlockStatement setterBlock = new BlockStatement();
@@ -223,7 +213,7 @@ public class VetoableASTTransformation extends BindableASTTransformation {
             // create method void <setter>(<type> fieldName)
             createSetterMethod(declaringClass, propertyNode, setterName, setterBlock);
         } else {
-            wrapSetterMethod(declaringClass, bindable, propertyNode.getName());
+            wrapSetterMethod(declaringClass, bindable, propertyNode);
         }
     }
 
@@ -308,6 +298,7 @@ public class VetoableASTTransformation extends BindableASTTransformation {
      * @param setterName     the name of the setter
      * @param setterBlock    the statement representing the setter block
      */
+    @Override
     protected void createSetterMethod(ClassNode declaringClass, PropertyNode propertyNode, String setterName, Statement setterBlock) {
         ClassNode[] exceptions = {ClassHelper.make(PropertyVetoException.class)};
         MethodNode setter = new MethodNode(

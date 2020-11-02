@@ -66,7 +66,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
      * owner first, then the delegate (<b>this is the default strategy</b>).
      *
      * For example the following code:
-     * <pre>
+     * <pre class="groovyTestCase">
      * class Test {
      *     def x = 30
      *     def y = 40
@@ -122,7 +122,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
      * With this resolveStrategy set the closure will resolve property references and methods to the owner only
      * and not call the delegate at all. For example the following code :
      *
-     * <pre>
+     * <pre class="groovyTestCase">
      * class Test {
      *     def x = 30
      *     def y = 40
@@ -139,7 +139,9 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
      *     }
      * }
      *
-     * new Test().run()
+     * groovy.test.GroovyAssert.shouldFail(MissingPropertyException) {
+     *     new Test().run()
+     * }
      * </pre>
      *
      * will throw "No such property: z" error because even if the z variable is declared in the delegate, no
@@ -152,7 +154,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
      * With this resolveStrategy set the closure will resolve property references and methods to the delegate
      * only and entirely bypass the owner. For example the following code :
      *
-     * <pre>
+     * <pre class="groovyTestCase">
      * class Test {
      *     def x = 30
      *     def y = 40
@@ -170,7 +172,9 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
      *     }
      * }
      *
-     * new Test().run()
+     * groovy.test.GroovyAssert.shouldFail {
+     *     new Test().run()
+     * }
      * </pre>
      *
      * will throw an error because even if the owner declares a "z" field, the resolution strategy will bypass
@@ -263,38 +267,46 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         return thisObject;
     }
 
+    @Override
     public Object getProperty(final String property) {
         if ("delegate".equals(property)) {
             return getDelegate();
-        } else if ("owner".equals(property)) {
+        }
+        if ("owner".equals(property)) {
             return getOwner();
-        } else if ("maximumNumberOfParameters".equals(property)) {
+        }
+        if ("maximumNumberOfParameters".equals(property)) {
             return getMaximumNumberOfParameters();
-        } else if ("parameterTypes".equals(property)) {
+        }
+        if ("parameterTypes".equals(property)) {
             return getParameterTypes();
-        } else if ("metaClass".equals(property)) {
+        }
+        if ("metaClass".equals(property)) {
             return getMetaClass();
-        } else if ("class".equals(property)) {
+        }
+        if ("class".equals(property)) {
             return getClass();
-        } else if ("directive".equals(property)) {
+        }
+        if ("directive".equals(property)) {
             return getDirective();
-        } else if ("resolveStrategy".equals(property)) {
+        }
+        if ("resolveStrategy".equals(property)) {
             return getResolveStrategy();
-        } else if ("thisObject".equals(property)) {
+        }
+        if ("thisObject".equals(property)) {
             return getThisObject();
-        } else {
-            switch(resolveStrategy) {
-                case DELEGATE_FIRST:
-                    return getPropertyDelegateFirst(property);
-                case DELEGATE_ONLY:
-                    return InvokerHelper.getProperty(this.delegate, property);
-                case OWNER_ONLY:
-                    return InvokerHelper.getProperty(this.owner, property);
-                case TO_SELF:
-                    return super.getProperty(property);
-                default:
-                    return getPropertyOwnerFirst(property);
-            }
+        }
+        switch(resolveStrategy) {
+            case DELEGATE_FIRST:
+                return getPropertyDelegateFirst(property);
+            case DELEGATE_ONLY:
+                return InvokerHelper.getProperty(this.delegate, property);
+            case OWNER_ONLY:
+                return InvokerHelper.getProperty(this.owner, property);
+            case TO_SELF:
+                return super.getProperty(property);
+            default:
+                return getPropertyOwnerFirst(property);
         }
     }
 
@@ -326,6 +338,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         }
     }
 
+    @Override
     public void setProperty(String property, Object newValue) {
         if ("delegate".equals(property)) {
             setDelegate(newValue);
@@ -394,6 +407,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
      *
      * @return the value if applicable or null if there is no return statement in the closure
      */
+    @Override
     public V call() {
         final Object[] NOARGS = EMPTY_OBJECT_ARRAY;
         return call(NOARGS);
@@ -482,6 +496,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
     /* (non-Javadoc)
      * @see java.lang.Runnable#run()
      */
+    @Override
     public void run() {
         call();
     }
@@ -873,6 +888,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
     /* (non-Javadoc)
      * @see java.lang.Object#clone()
      */
+    @Override
     public Object clone() {
         try {
             return super.clone();
@@ -901,6 +917,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Writable#writeTo(java.io.Writer)
          */
+        @Override
         public Writer writeTo(Writer out) throws IOException {
             Closure.this.call(new Object[]{out});
 
@@ -910,21 +927,24 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.GroovyObject#invokeMethod(java.lang.String, java.lang.Object)
          */
+        @Override
         public Object invokeMethod(String method, Object arguments) {
             if ("clone".equals(method)) {
                 return clone();
-            } else if ("curry".equals(method)) {
-                return curry((Object[]) arguments);
-            } else if ("asWritable".equals(method)) {
-                return asWritable();
-            } else {
-                return Closure.this.invokeMethod(method, arguments);
             }
+            if ("curry".equals(method)) {
+                return curry((Object[]) arguments);
+            }
+            if ("asWritable".equals(method)) {
+                return asWritable();
+            }
+            return Closure.this.invokeMethod(method, arguments);
         }
 
         /* (non-Javadoc)
          * @see groovy.lang.GroovyObject#getProperty(java.lang.String)
          */
+        @Override
         public Object getProperty(String property) {
             return Closure.this.getProperty(property);
         }
@@ -932,6 +952,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.GroovyObject#setProperty(java.lang.String, java.lang.Object)
          */
+        @Override
         public void setProperty(String property, Object newValue) {
             Closure.this.setProperty(property, newValue);
         }
@@ -939,6 +960,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Closure#call()
          */
+        @Override
         public Object call() {
             return ((Closure) getOwner()).call();
         }
@@ -946,10 +968,12 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Closure#call(java.lang.Object)
          */
+        @Override
         public Object call(Object arguments) {
             return ((Closure) getOwner()).call(arguments);
         }
 
+        @Override
         public Object call(Object... args) {
             return ((Closure) getOwner()).call(args);
         }
@@ -961,6 +985,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Closure#getDelegate()
          */
+        @Override
         public Object getDelegate() {
             return Closure.this.getDelegate();
         }
@@ -968,6 +993,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Closure#setDelegate(java.lang.Object)
          */
+        @Override
         public void setDelegate(Object delegate) {
             Closure.this.setDelegate(delegate);
         }
@@ -975,6 +1001,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Closure#getParameterTypes()
          */
+        @Override
         public Class[] getParameterTypes() {
             return Closure.this.getParameterTypes();
         }
@@ -982,6 +1009,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Closure#getParameterTypes()
          */
+        @Override
         public int getMaximumNumberOfParameters() {
             return Closure.this.getMaximumNumberOfParameters();
         }
@@ -989,6 +1017,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see groovy.lang.Closure#asWritable()
          */
+        @Override
         public Closure asWritable() {
             return this;
         }
@@ -996,6 +1025,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see java.lang.Runnable#run()
          */
+        @Override
         public void run() {
             Closure.this.run();
         }
@@ -1003,6 +1033,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see java.lang.Object#clone()
          */
+        @Override
         public Object clone() {
             return ((Closure) Closure.this.clone()).asWritable();
         }
@@ -1010,6 +1041,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see java.lang.Object#hashCode()
          */
+        @Override
         public int hashCode() {
             return Closure.this.hashCode();
         }
@@ -1017,6 +1049,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see java.lang.Object#equals(java.lang.Object)
          */
+        @Override
         public boolean equals(Object arg0) {
             return Closure.this.equals(arg0);
         }
@@ -1024,6 +1057,7 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
         /* (non-Javadoc)
          * @see java.lang.Object#toString()
          */
+        @Override
         public String toString() {
             final Writer writer = new StringBuilderWriter();
 
@@ -1036,14 +1070,17 @@ public abstract class Closure<V> extends GroovyObjectSupport implements Cloneabl
             return writer.toString();
         }
 
+        @Override
         public Closure curry(final Object... arguments) {
             return (new CurriedClosure(this, arguments)).asWritable();
         }
 
+        @Override
         public void setResolveStrategy(int resolveStrategy) {
             Closure.this.setResolveStrategy(resolveStrategy);
         }
 
+        @Override
         public int getResolveStrategy() {
             return Closure.this.getResolveStrategy();
         }

@@ -31,13 +31,14 @@ public class ConstructorSite extends MetaClassSite {
     final Class[] params;
     private final int version;
 
-    public ConstructorSite(CallSite site, MetaClassImpl metaClass, CachedConstructor constructor, Class params[]) {
+    public ConstructorSite(CallSite site, MetaClassImpl metaClass, CachedConstructor constructor, Class[] params) {
         super(site, metaClass);
         this.constructor = constructor;
         this.params = params;
         this.version = metaClass.getVersion();
     }
 
+    @Override
     public Object callConstructor(Object receiver, Object[] args) throws Throwable {
         if (checkCall(receiver, args)) {
             MetaClassHelper.unwrap(args);
@@ -74,10 +75,11 @@ public class ConstructorSite extends MetaClassSite {
      */
     public static class ConstructorSiteNoUnwrap extends ConstructorSite {
 
-        public ConstructorSiteNoUnwrap(CallSite site, MetaClassImpl metaClass, CachedConstructor constructor, Class params[]) {
+        public ConstructorSiteNoUnwrap(CallSite site, MetaClassImpl metaClass, CachedConstructor constructor, Class[] params) {
             super(site, metaClass, constructor, params);
         }
 
+        @Override
         public final Object callConstructor(Object receiver, Object[] args) throws Throwable {
             if (checkCall(receiver, args)) {
                 try {
@@ -95,10 +97,11 @@ public class ConstructorSite extends MetaClassSite {
      */
     public static class ConstructorSiteNoUnwrapNoCoerce extends ConstructorSite {
 
-        public ConstructorSiteNoUnwrapNoCoerce(CallSite site, MetaClassImpl metaClass, CachedConstructor constructor, Class params[]) {
+        public ConstructorSiteNoUnwrapNoCoerce(CallSite site, MetaClassImpl metaClass, CachedConstructor constructor, Class[] params) {
             super(site, metaClass, constructor, params);
         }
 
+        @Override
         public Object callConstructor(Object receiver, Object[] args) throws Throwable {
             if (checkCall(receiver, args)) {
                 try {
@@ -118,6 +121,7 @@ public class ConstructorSite extends MetaClassSite {
             super(site, metaClass, constructor, params);
         }
 
+        @Override
         public final Object callConstructor(Object receiver, Object[] args) throws Throwable {
             if (checkCall(receiver, args)) {
                 final Object bean = constructor.invoke(NO_ARGS);
@@ -137,6 +141,7 @@ public class ConstructorSite extends MetaClassSite {
             super(site, metaClass, constructor, params);
         }
 
+        @Override
         public final Object callConstructor(Object receiver, Object[] args) throws Throwable {
             if (checkCall(receiver, args)) {
                 final Object[] newArgs = new Object[] {args[0]};

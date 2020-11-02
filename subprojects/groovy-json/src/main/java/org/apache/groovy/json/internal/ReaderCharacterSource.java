@@ -92,21 +92,25 @@ public class ReaderCharacterSource implements CharacterSource {
         }
     }
 
+    @Override
     public final int nextChar() {
         ensureBuffer();
         return ch = readBuf[index++];
     }
 
+    @Override
     public final int currentChar() {
         ensureBuffer();
         return readBuf[index];
     }
 
+    @Override
     public final boolean hasChar() {
         ensureBuffer();
         return more;
     }
 
+    @Override
     public final boolean consumeIfMatch(char[] match) {
         try {
             char[] _chars = readBuf;
@@ -135,10 +139,12 @@ public class ReaderCharacterSource implements CharacterSource {
         }
     }
 
+    @Override
     public final int location() {
         return index;
     }
 
+    @Override
     public final int safeNextChar() {
         try {
             ensureBuffer();
@@ -151,6 +157,7 @@ public class ReaderCharacterSource implements CharacterSource {
 
     private static final char[] EMPTY_CHARS = new char[0];
 
+    @Override
     public char[] findNextChar(int match, int esc) {
         try {
             ensureBuffer();
@@ -213,10 +220,12 @@ public class ReaderCharacterSource implements CharacterSource {
         }
     }
 
+    @Override
     public boolean hadEscape() {
         return foundEscape;
     }
 
+    @Override
     public void skipWhiteSpace() {
         try {
             index = CharScanner.skipWhiteSpace(readBuf, index, length);
@@ -231,6 +240,7 @@ public class ReaderCharacterSource implements CharacterSource {
         }
     }
 
+    @Override
     public char[] readNumber() {
         try {
             ensureBuffer();
@@ -241,7 +251,7 @@ public class ReaderCharacterSource implements CharacterSource {
             if (index >= length && more) {
                 ensureBuffer();
                 if (length != 0) {
-                    char results2[] = readNumber();
+                    char[] results2 = readNumber();
                     return Chr.add(results, results2);
                 } else {
                     return results;
@@ -255,6 +265,7 @@ public class ReaderCharacterSource implements CharacterSource {
         }
     }
 
+    @Override
     public String errorDetails(String message) {
         return CharScanner.errorDetails(message, readBuf, index, ch);
     }

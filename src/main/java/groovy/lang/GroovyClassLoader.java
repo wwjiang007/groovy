@@ -26,6 +26,7 @@
 package groovy.lang;
 
 import groovy.util.CharsetToolkit;
+import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.ClassNode;
 import org.codehaus.groovy.ast.FieldNode;
@@ -108,6 +109,7 @@ public class GroovyClassLoader extends URLClassLoader {
     private static int scriptNameCounter = 1000000;
 
     private GroovyResourceLoader resourceLoader = new GroovyResourceLoader() {
+        @Override
         public URL loadGroovySource(final String filename) throws MalformedURLException {
             return AccessController.doPrivileged((PrivilegedAction<URL>) () -> {
                 for (String extension : config.getScriptExtensions()) {
@@ -115,7 +117,7 @@ public class GroovyClassLoader extends URLClassLoader {
                         URL ret = getSourceFile(filename, extension);
                         if (ret != null)
                             return ret;
-                    } catch (Throwable t) { //
+                    } catch (Throwable t) {
                     }
                 }
                 return null;
@@ -263,8 +265,11 @@ public class GroovyClassLoader extends URLClassLoader {
      * @return the main class defined in the given script
      */
     public Class parseClass(String text) throws CompilationFailedException {
-        return parseClass(text, "script" + System.currentTimeMillis() +
-                Math.abs((long) text.hashCode()) + ".groovy");
+        try {
+            return parseClass(text, "Script_" + EncodingGroovyMethods.md5(text) + ".groovy");
+        } catch (NoSuchAlgorithmException e) {
+            throw new GroovyBugError("Failed to generate md5", e); // should never happen
+        }
     }
 
     public synchronized String generateScriptName() {
@@ -279,28 +284,6 @@ public class GroovyClassLoader extends URLClassLoader {
                 return new GroovyCodeSource(scriptText, fileName, "/groovy/script");
             } catch (IOException e) {
                 throw new RuntimeException("Impossible to read the content of the reader for file named: " + fileName, e);
-            }
-        });
-        return parseClass(gcs);
-    }
-
-    /**
-     * @deprecated Prefer using methods taking a Reader rather than an InputStream to avoid wrong encoding issues.
-     * Use {@link #parseClass(Reader, String) parseClass} instead
-     */
-    @Deprecated
-    public Class parseClass(final InputStream in, final String fileName) throws CompilationFailedException {
-        // For generic input streams, provide a catch-all codebase of GroovyScript
-        // Security for these classes can be administered via policy grants with
-        // a codebase of file:groovy.script
-        GroovyCodeSource gcs = AccessController.doPrivileged((PrivilegedAction<GroovyCodeSource>) () -> {
-            try {
-                String scriptText = config.getSourceEncoding() != null ?
-                        IOGroovyMethods.getText(in, config.getSourceEncoding()) :
-                        IOGroovyMethods.getText(in);
-                return new GroovyCodeSource(scriptText, fileName, "/groovy/script");
-            } catch (IOException e) {
-                throw new RuntimeException("Impossible to read the content of the input stream for file named: " + fileName, e);
             }
         });
         return parseClass(gcs);
@@ -431,6 +414,7 @@ public class GroovyClassLoader extends URLClassLoader {
         return ret;
     }
 
+    @Override
     protected PermissionCollection getPermissions(CodeSource codeSource) {
         PermissionCollection perms;
         try {
@@ -442,6 +426,7 @@ public class GroovyClassLoader extends URLClassLoader {
             }
 
             ProtectionDomain myDomain = AccessController.doPrivileged(new PrivilegedAction<ProtectionDomain>() {
+                @Override
                 public ProtectionDomain run() {
                     return getClass().getProtectionDomain();
                 }
@@ -568,12 +553,6 @@ public class GroovyClassLoader extends URLClassLoader {
         }
 
         @Override
-        @Deprecated
-        public Class parseClass(InputStream in, String fileName) throws CompilationFailedException {
-            return delegate.parseClass(in, fileName);
-        }
-
-        @Override
         public Class parseClass(GroovyCodeSource codeSource) throws CompilationFailedException {
             return delegate.parseClass(codeSource);
         }
@@ -630,8 +609,11 @@ public class GroovyClassLoader extends URLClassLoader {
 
         @Override
         public void close() throws IOException {
-            super.close();
-            delegate.close();
+            try {
+                super.close();
+            } finally {
+                delegate.close();
+            }
         }
 
         public long getTimeStamp() {
@@ -698,7 +680,7 @@ public class GroovyClassLoader extends URLClassLoader {
                 SourceUnit msu = null;
                 if (mn != null) msu = mn.getContext();
                 ClassNode main = null;
-                if (mn != null) main = (ClassNode) mn.getClasses().get(0);
+                if (mn != null) main = mn.getClasses().get(0);
                 if (msu == su && main == classNode) generatedClass = theClass;
             }
 
@@ -710,6 +692,7 @@ public class GroovyClassLoader extends URLClassLoader {
             return createClass(code, classNode);
         }
 
+        @Override
         public void call(ClassVisitor classWriter, ClassNode classNode) {
             onClassNode((ClassWriter) classWriter, classNode);
         }
@@ -782,6 +765,7 @@ public class GroovyClassLoader extends URLClassLoader {
      *
      * @param url the new classpath element
      */
+    @Override
     public void addURL(URL url) {
         super.addURL(url);
     }
@@ -809,8 +793,7 @@ public class GroovyClassLoader extends URLClassLoader {
         if (recompile != null && !recompile) return false;
         if (!GroovyObject.class.isAssignableFrom(cls)) return false;
         long timestamp = getTimeStamp(cls);
-        if (timestamp == Long.MAX_VALUE) return false;
-        return true;
+        return timestamp != Long.MAX_VALUE;
     }
 
     /**
@@ -969,6 +952,7 @@ public class GroovyClassLoader extends URLClassLoader {
      * @throws ClassNotFoundException     if the class was not found
      * @see java.lang.ClassLoader#loadClass(java.lang.String, boolean)
      */
+    @Override
     protected Class loadClass(final String name, boolean resolve) throws ClassNotFoundException {
         return loadClass(name, true, true, resolve);
     }
@@ -1178,7 +1162,7 @@ public class GroovyClassLoader extends URLClassLoader {
         clearCache();
     }
 
-    private static class TimestampAdder extends CompilationUnit.PrimaryClassNodeOperation implements Opcodes {
+    private static class TimestampAdder implements CompilationUnit.IPrimaryClassNodeOperation, Opcodes {
         private static final TimestampAdder INSTANCE = new TimestampAdder();
 
         private TimestampAdder() {}
@@ -1197,7 +1181,7 @@ public class GroovyClassLoader extends URLClassLoader {
                 node.addField(timeTagField);
 
                 timeTagField = new FieldNode(
-                        Verifier.__TIMESTAMP__ + String.valueOf(System.currentTimeMillis()),
+                        Verifier.__TIMESTAMP__ + System.currentTimeMillis(),
                         ACC_PUBLIC | ACC_STATIC | ACC_SYNTHETIC,
                         ClassHelper.long_TYPE,
                         //"",

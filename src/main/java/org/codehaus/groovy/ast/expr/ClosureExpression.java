@@ -39,17 +39,20 @@ public class ClosureExpression extends Expression {
     public ClosureExpression(Parameter[] parameters, Statement code) {
         this.parameters = parameters;
         this.code = code;
-        super.setType(ClassHelper.CLOSURE_TYPE.getPlainNodeReference());
+        setType(ClassHelper.CLOSURE_TYPE.getPlainNodeReference());
     }
 
+    @Override
     public void visit(GroovyCodeVisitor visitor) {
         visitor.visitClosureExpression(this);
     }
 
+    @Override
     public Expression transformExpression(ExpressionTransformer transformer) {
         return this;
     }
 
+    @Override
     public String toString() {
         return super.toString() + InvokerHelper.toString(parameters) + "{ " + code + " }";
     }
@@ -85,7 +88,7 @@ public class ClosureExpression extends Expression {
      * @return {@code true} if one or more explicit parameters are supplied
      */
     public boolean isParameterSpecified() {
-        return parameters != null && parameters.length > 0;
+        return (parameters != null && parameters.length > 0);
     }
 
     public VariableScope getVariableScope() {

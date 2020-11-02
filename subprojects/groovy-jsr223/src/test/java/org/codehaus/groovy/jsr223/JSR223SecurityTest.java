@@ -25,7 +25,6 @@ import org.codehaus.groovy.ast.expr.MethodCallExpression;
 import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.classgen.GeneratorContext;
 import org.codehaus.groovy.control.CompilationUnit;
-import org.codehaus.groovy.control.CompilationUnit.PrimaryClassNodeOperation;
 import org.codehaus.groovy.control.CompilerConfiguration;
 import org.codehaus.groovy.control.Phases;
 import org.codehaus.groovy.control.SourceUnit;
@@ -35,6 +34,7 @@ import org.junit.Test;
 import javax.script.ScriptEngine;
 import javax.script.ScriptEngineManager;
 import javax.script.ScriptException;
+
 import java.lang.reflect.Field;
 import java.security.CodeSource;
 import java.util.HashSet;
@@ -99,7 +99,7 @@ class GroovySecurityManager {
 
     private static GroovySecurityManager instance = new GroovySecurityManager();
 
-    private Set<String> blacklist = new HashSet<String>();
+    private Set<String> forbiddenList = new HashSet<String>();
 
     private GroovySecurityManager() { }
 
@@ -122,11 +122,11 @@ class GroovySecurityManager {
     }
 
     public void forbid(String instruction) {
-        blacklist.add(instruction);
+        forbiddenList.add(instruction);
     }
 
     public boolean isForbidden(String instruction) {
-        for (String forbidden : blacklist)
+        for (String forbidden : forbiddenList)
             if (instruction.startsWith(forbidden))
                 return true;
 
@@ -161,11 +161,12 @@ class CustomGroovyClassLoader extends GroovyClassLoader {
     }
 }
 
-class CustomPrimaryClassNodeOperation extends PrimaryClassNodeOperation {
-
+class CustomPrimaryClassNodeOperation implements CompilationUnit.IPrimaryClassNodeOperation {
+    @Override
     public void call(SourceUnit source, GeneratorContext context, ClassNode classNode) {
-        for (Object statement : source.getAST().getStatementBlock().getStatements())
+        for (Object statement : source.getAST().getStatementBlock().getStatements()) {
             ((ExpressionStatement) statement).visit(new CustomCodeVisitorSupport());
+        }
     }
 }
 

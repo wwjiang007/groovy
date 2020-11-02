@@ -61,6 +61,16 @@ class GroovyshTest extends GroovyTestCase {
         }
     }
 
+    void testBindingContext() {
+        Binding binding = new Binding()
+        binding.setVariable("context", "bla")
+
+        Groovysh groovysh = new Groovysh(binding, testio)
+        groovysh.run('')
+        System.out.println(mockErr.toString())
+        assertTrue(mockErr.toString(), !mockErr.toString().contains("CastException"))
+    }
+
     void testClassDef() {
         Groovysh groovysh = createGroovysh()
         groovysh.execute('class MyFooTestClass{ String foo }')
@@ -92,6 +102,20 @@ class GroovyshTest extends GroovyTestCase {
         Groovysh groovysh = createGroovysh()
         try {
             groovysh.execute('x}')
+            fail('expected MultipleCompilationErrorsException ')
+        } catch (MultipleCompilationErrorsException e) {
+            assert '' == mockOut.toString()
+        }
+
+        try {
+            groovysh.execute('x)')
+            fail('expected MultipleCompilationErrorsException ')
+        } catch (MultipleCompilationErrorsException e) {
+            assert '' == mockOut.toString()
+        }
+
+        try {
+            groovysh.execute('x]')
             fail('expected MultipleCompilationErrorsException ')
         } catch (MultipleCompilationErrorsException e) {
             assert '' == mockOut.toString()

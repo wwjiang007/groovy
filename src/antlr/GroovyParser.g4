@@ -42,7 +42,6 @@ options {
 @header {
     import java.util.Map;
     import org.codehaus.groovy.ast.NodeMetaDataHandler;
-    import org.apache.groovy.parser.antlr4.SemanticPredicates;
 }
 
 @members {
@@ -97,8 +96,7 @@ options {
 
 // starting point for parsing a groovy file
 compilationUnit
-    :   nls
-        packageDeclaration? sep? scriptStatements? EOF
+    :   nls (packageDeclaration sep?)? scriptStatements? EOF
     ;
 
 scriptStatements
@@ -108,6 +106,9 @@ scriptStatements
 scriptStatement
     :   importDeclaration // Import statement.  Can be used in any scope.  Has "import x as y" also.
     |   typeDeclaration
+    // validate the method in the AstBuilder#visitMethodDeclaration, e.g. method without method body is not allowed
+    |   { !SemanticPredicates.isInvalidMethodDeclaration(_input) }?
+        methodDeclaration[3, 9]
     |   statement
     ;
 
@@ -136,19 +137,21 @@ modifier
     ;
 
 modifiersOpt
-    :   modifiers?
+    :   (modifiers nls)?
     ;
 
 modifiers
-    :   (modifier nls)+
+    :   modifier (nls modifier)*
     ;
 
 classOrInterfaceModifiersOpt
-    :   classOrInterfaceModifiers?
+    :   (classOrInterfaceModifiers
+            NL* /* Use `NL*` here for better performance, so DON'T replace it with `nls` */
+        )?
     ;
 
 classOrInterfaceModifiers
-    :   (classOrInterfaceModifier nls)+
+    :   classOrInterfaceModifier (nls classOrInterfaceModifier)*
     ;
 
 classOrInterfaceModifier
@@ -184,11 +187,11 @@ variableModifier
     ;
 
 variableModifiersOpt
-    :   variableModifiers?
+    :   (variableModifiers nls)?
     ;
 
 variableModifiers
-    :   (variableModifier nls)+
+    :   variableModifier (nls variableModifier)*
     ;
 
 typeParameters
@@ -219,36 +222,11 @@ locals[ int t ]
         |   AT INTERFACE { $t = 3; }
         |   TRAIT { $t = 4; }
         )
-        identifier nls
-
-        (
-            { 3 != $t }?
-            typeParameters? nls
-            (
-                { 2 != $t }?
-                (EXTENDS nls
-                    (
-                        // Only interface can extend more than one super class
-                        {1 == $t}? scs=typeList
-                    |
-                        sc=type
-                    )
-                nls)?
-            |
-                /* enum should not have type parameters and extends */
-            )
-
-            (
-                {1 != $t}?
-                (IMPLEMENTS nls is=typeList nls)?
-            |
-                /* interface should not implement other interfaces */
-            )
-        |
-            /* annotation should not have implements and extends*/
-        )
-
-        classBody[$t]
+        identifier
+        (nls typeParameters)?
+        (nls EXTENDS nls scs=typeList)?
+        (nls IMPLEMENTS nls is=typeList)?
+        nls classBody[$t]
     ;
 
 // t    see the comment of classDeclaration
@@ -257,15 +235,14 @@ classBody[int t]
         (
             /* Only enum can have enum constants */
             { 2 == $t }?
-            enumConstants? sep?
+            enumConstants (nls COMMA)? sep?
         |
-
         )
-        classBodyDeclaration[$t]? (sep classBodyDeclaration[$t])* sep? RBRACE
+        (classBodyDeclaration[$t] (sep classBodyDeclaration[$t])*)? sep? RBRACE
     ;
 
 enumConstants
-    :   enumConstant (nls COMMA nls enumConstant)* (nls COMMA)?
+    :   enumConstant (nls COMMA nls enumConstant)*
     ;
 
 enumConstant
@@ -273,8 +250,7 @@ enumConstant
     ;
 
 classBodyDeclaration[int t]
-    :   SEMI
-    |   (STATIC nls)? block
+    :   (STATIC nls)? block
     |   memberDeclaration[$t]
     ;
 
@@ -291,12 +267,14 @@ memberDeclaration[int t]
  *  ct  9: script, other see the comment of classDeclaration
  */
 methodDeclaration[int t, int ct]
-    :   { 3 == $ct }?
-        returnType[$ct] methodName LPAREN rparen (DEFAULT nls elementValue)?
-    |
-        modifiersOpt typeParameters? returnType[$ct]?
-        methodName formalParameters (nls THROWS nls qualifiedClassNameList)?
-        nls methodBody?
+    :   modifiersOpt typeParameters? returnType[$ct]?
+        methodName formalParameters
+        (
+            DEFAULT nls elementValue
+        |
+            (nls THROWS nls qualifiedClassNameList)?
+            (nls methodBody)?
+        )?
     ;
 
 methodName
@@ -307,9 +285,7 @@ methodName
 returnType[int ct]
     :
         standardType
-    |
-        // annotation method can not have void return type
-        { 3 != $ct }? VOID
+    |   VOID
     ;
 
 fieldDeclaration
@@ -333,15 +309,15 @@ variableInitializer
     ;
 
 variableInitializers
-    :   variableInitializer nls (COMMA nls variableInitializer nls)* nls COMMA?
+    :   variableInitializer (nls COMMA nls variableInitializer)* nls COMMA?
     ;
 
-dims
+emptyDims
     :   (annotationsOpt LBRACK RBRACK)+
     ;
 
-dimsOpt
-    :   dims?
+emptyDimsOpt
+    :   emptyDims?
     ;
 
 standardType
@@ -352,7 +328,7 @@ options { baseContext = type; }
         |
             standardClassOrInterfaceType
         )
-        dimsOpt
+        emptyDimsOpt
     ;
 
 type
@@ -367,7 +343,7 @@ type
         |
                 generalClassOrInterfaceType
         )
-        dimsOpt
+        emptyDimsOpt
     ;
 
 classOrInterfaceType
@@ -471,7 +447,6 @@ gstring
 
 gstringValue
     :   gstringPath
-    |   LBRACE statementExpression? RBRACE
     |   closure
     ;
 
@@ -512,7 +487,7 @@ lambdaBody
 
 // CLOSURE
 closure
-    :   LBRACE nls (formalParameterList? nls ARROW nls)? blockStatementsOpt RBRACE
+    :   LBRACE (nls (formalParameterList nls)? ARROW)? sep? blockStatementsOpt RBRACE
     ;
 
 // GROOVY-8991: Difference in behaviour with closure and lambda
@@ -532,11 +507,11 @@ blockStatements
 // ANNOTATIONS
 
 annotationsOpt
-    :   (annotation nls)*
+    :   (annotation (nls annotation)* nls)?
     ;
 
 annotation
-    :   AT annotationName ( LPAREN elementValues? rparen )?
+    :   AT annotationName (nls LPAREN elementValues? rparen)?
     ;
 
 elementValues
@@ -567,13 +542,13 @@ elementValue
     ;
 
 elementValueArrayInitializer
-    :   LBRACK (elementValue (COMMA elementValue)*)? (COMMA)? RBRACK
+    :   LBRACK (elementValue (COMMA elementValue)* COMMA?)? RBRACK
     ;
 
 // STATEMENTS / BLOCKS
 
 block
-    :   LBRACE (nls | sep*) blockStatementsOpt RBRACE
+    :   LBRACE sep? blockStatementsOpt RBRACE
     ;
 
 blockStatement
@@ -586,23 +561,15 @@ localVariableDeclaration
         variableDeclaration[0]
     ;
 
-classifiedModifiers[int t]
-    :   { 0 == $t }? variableModifiers
-    |   { 1 == $t }? modifiers
-    ;
-
-
 /**
  *  t   0: local variable declaration; 1: field declaration
  */
 variableDeclaration[int t]
-@leftfactor { classifiedModifiers }
-    :   classifiedModifiers[$t]
+    :   modifiers nls
         (   type? variableDeclarators
         |   typeNamePairs nls ASSIGN nls variableInitializer
         )
     |
-        classifiedModifiers[$t]?
         type variableDeclarators
     ;
 
@@ -628,7 +595,7 @@ ifElseStatement
     ;
 
 switchStatement
-    :   SWITCH expressionInPar nls LBRACE nls switchBlockStatementGroup* nls RBRACE
+    :   SWITCH expressionInPar nls LBRACE nls (switchBlockStatementGroup+ nls)? RBRACE
     ;
 
 loopStatement
@@ -661,28 +628,16 @@ statement
     :   block                                                                                               #blockStmtAlt
     |   conditionalStatement                                                                                #conditionalStmtAlt
     |   loopStatement                                                                                       #loopStmtAlt
-
     |   tryCatchStatement                                                                                   #tryCatchStmtAlt
-
     |   SYNCHRONIZED expressionInPar nls block                                                              #synchronizedStmtAlt
     |   RETURN expression?                                                                                  #returnStmtAlt
     |   THROW expression                                                                                    #throwStmtAlt
-
     |   breakStatement                                                                                      #breakStmtAlt
     |   continueStatement                                                                                   #continueStmtAlt
-
     |   identifier COLON nls statement                                                                      #labeledStmtAlt
-
     |   assertStatement                                                                                     #assertStmtAlt
-
     |   localVariableDeclaration                                                                            #localVariableDeclarationStmtAlt
-
-    // validate the method in the AstBuilder#visitMethodDeclaration, e.g. method without method body is not allowed
-    |   { !SemanticPredicates.isInvalidMethodDeclaration(_input) }?
-        methodDeclaration[3, 9]                                                                             #methodDeclarationStmtAlt
-
     |   statementExpression                                                                                 #expressionStmtAlt
-
     |   SEMI                                                                                                #emptyStmtAlt
     ;
 
@@ -716,7 +671,7 @@ resource
  *  To handle empty cases at the end, we add switchLabel* to statement.
  */
 switchBlockStatementGroup
-    :   (switchLabel nls)+ blockStatements
+    :   switchLabel (nls switchLabel)* nls blockStatements
     ;
 
 switchLabel
@@ -766,9 +721,7 @@ expressionList[boolean canSpread]
     ;
 
 expressionListElement[boolean canSpread]
-    :   (   MUL { require($canSpread, "spread operator is not allowed here", -1); }
-        |
-        ) expression
+    :   MUL? expression
     ;
 
 enhancedStatementExpression
@@ -885,19 +838,13 @@ castOperandExpression
 options { baseContext = expression; }
     :   castParExpression castOperandExpression                                             #castExprAlt
     |   postfixExpression                                                                   #postfixExprAlt
+
     // ~(BNOT)/!(LNOT) (level 1)
     |   (BITNOT | NOT) nls castOperandExpression                                            #unaryNotExprAlt
+
     // ++(prefix)/--(prefix)/+(unary)/-(unary) (level 3)
     |   op=(INC | DEC | ADD | SUB) castOperandExpression                                    #unaryAddExprAlt
     ;
-
-
-/*
-enhancedExpression
-    :   expression
-    |   standardLambdaExpression
-    ;
-*/
 
 commandExpression
     :   expression
@@ -912,7 +859,7 @@ commandExpression
     ;
 
 commandArgument
-    :   primary
+    :   commandPrimary
         // what follows is either a normal argument, parens,
         // an appended block, an index operation, or nothing
         // parens (a b already processed):
@@ -945,35 +892,43 @@ commandArgument
  *      6: non-static inner class creator
  */
 pathExpression returns [int t]
-    :   primary (pathElement { $t = $pathElement.t; })*
+    :   (
+            primary
+        |
+            // if 'static' followed by DOT, we can treat them as identifiers, e.g. static.unused = { -> }
+            { DOT == _input.LT(2).getType() }?
+            STATIC
+        ) (pathElement { $t = $pathElement.t; })*
     ;
 
 pathElement returns [int t]
     :   nls
-
-        // AT: foo.@bar selects the field (or attribute), not property
         (
-            (   DOT                 // The all-powerful dot.
-            |   SPREAD_DOT          // Spread operator:  x*.y  ===  x?.collect{it.y}
-            |   SAFE_DOT            // Optional-null operator:  x?.y  === (x==null)?null:x.y
-            |   SAFE_CHAIN_DOT      // Optional-null chain operator:  x??.y.z  === x?.y?.z
-            ) nls (AT | nonWildcardTypeArguments)?
+            // AT: foo.@bar selects the field (or attribute), not property
+            (
+                (   DOT                 // The all-powerful dot.
+                |   SPREAD_DOT          // Spread operator:  x*.y  ===  x?.collect{it.y}
+                |   SAFE_DOT            // Optional-null operator:  x?.y  === (x==null)?null:x.y
+                |   SAFE_CHAIN_DOT      // Optional-null chain operator:  x??.y.z  === x?.y?.z
+                ) nls (AT | nonWildcardTypeArguments)?
+            |
+                METHOD_POINTER nls      // Method pointer operator: foo.&y == foo.metaClass.getMethodPointer(foo, "y")
+            |
+                METHOD_REFERENCE nls    // Method reference: System.out::println
+            )
+            namePart
+            { $t = 1; }
         |
-            METHOD_POINTER nls      // Method pointer operator: foo.&y == foo.metaClass.getMethodPointer(foo, "y")
-        |
-            METHOD_REFERENCE nls    // Method reference: System.out::println
+            DOT nls NEW creator[1]
+            { $t = 6; }
+
+            // Can always append a block, as foo{bar}
+        |   closureOrLambdaExpression
+            { $t = 3; }
         )
-        namePart
-        { $t = 1; }
-    |
-        nls DOT nls NEW creator[1]
-        { $t = 6; }
+
     |   arguments
         { $t = 2; }
-
-    // Can always append a block, as foo{bar}
-    |   nls closureOrLambdaExpression
-        { $t = 3; }
 
     // Element selection is always an option, too.
     // In Groovy, the stuff between brackets is a general argument list,
@@ -1028,7 +983,7 @@ indexPropertyArgs
     ;
 
 namedPropertyArgs
-    :   QUESTION? LBRACK (mapEntryList | COLON) RBRACK
+    :   QUESTION? LBRACK (namedPropertyArgList | COLON) RBRACK
     ;
 
 primary
@@ -1048,6 +1003,28 @@ primary
     |   builtInType                                                                         #builtInTypePrmrAlt
     ;
 
+namedPropertyArgPrimary
+options { baseContext = primary; }
+    :   identifier                                                                          #identifierPrmrAlt
+    |   literal                                                                             #literalPrmrAlt
+    |   gstring                                                                             #gstringPrmrAlt
+    |   parExpression                                                                       #parenPrmrAlt
+    ;
+
+namedArgPrimary
+options { baseContext = primary; }
+    :   identifier                                                                          #identifierPrmrAlt
+    |   literal                                                                             #literalPrmrAlt
+    |   gstring                                                                             #gstringPrmrAlt
+    ;
+
+commandPrimary
+options { baseContext = primary; }
+    :   identifier                                                                          #identifierPrmrAlt
+    |   literal                                                                             #literalPrmrAlt
+    |   gstring                                                                             #gstringPrmrAlt
+    ;
+
 list
     :   LBRACK expressionList[true]? COMMA? RBRACK
     ;
@@ -1064,8 +1041,25 @@ mapEntryList
     :   mapEntry (COMMA mapEntry)*
     ;
 
+namedPropertyArgList
+options { baseContext = mapEntryList; }
+    :   namedPropertyArg (COMMA namedPropertyArg)*
+    ;
+
 mapEntry
     :   mapEntryLabel COLON nls expression
+    |   MUL COLON nls expression
+    ;
+
+namedPropertyArg
+options { baseContext = mapEntry; }
+    :   namedPropertyArgLabel COLON nls expression
+    |   MUL COLON nls expression
+    ;
+
+namedArg
+options { baseContext = mapEntry; }
+    :   namedArgLabel COLON nls expression
     |   MUL COLON nls expression
     ;
 
@@ -1074,19 +1068,34 @@ mapEntryLabel
     |   primary
     ;
 
+namedPropertyArgLabel
+options { baseContext = mapEntryLabel; }
+    :   keywords
+    |   namedPropertyArgPrimary
+    ;
+
+namedArgLabel
+options { baseContext = mapEntryLabel; }
+    :   keywords
+    |   namedArgPrimary
+    ;
+
 /**
  *  t 0: general creation; 1: non-static inner class creation
  */
 creator[int t]
     :   createdName
-        (   {0 == $t || 1 == $t}? nls arguments anonymousInnerClassDeclaration[0]?
-        |   {0 == $t}?            (annotationsOpt LBRACK expression RBRACK)+ dimsOpt
-        |   {0 == $t}?            dims nls arrayInitializer
+        (   nls arguments anonymousInnerClassDeclaration[0]?
+        |   dim+ (nls arrayInitializer)?
         )
     ;
 
+dim
+    :   annotationsOpt LBRACK expression? RBRACK
+    ;
+
 arrayInitializer
-    :   LBRACE nls variableInitializers? nls RBRACE
+    :   LBRACE nls (variableInitializers nls)? RBRACE
     ;
 
 /**
@@ -1113,34 +1122,55 @@ typeArgumentsOrDiamond
     ;
 
 arguments
-    :   LPAREN enhancedArgumentList? COMMA? rparen
+    :   LPAREN enhancedArgumentListInPar? COMMA? rparen
     ;
 
 argumentList
-options { baseContext = enhancedArgumentList; }
-    :   argumentListElement
+options { baseContext = enhancedArgumentListInPar; }
+    :   firstArgumentListElement
         (   COMMA nls
             argumentListElement
         )*
     ;
 
 enhancedArgumentList
+options { baseContext = enhancedArgumentListInPar; }
+    :   firstEnhancedArgumentListElement
+        (   COMMA nls
+            enhancedArgumentListElement
+        )*
+    ;
+
+enhancedArgumentListInPar
     :   enhancedArgumentListElement
         (   COMMA nls
             enhancedArgumentListElement
         )*
     ;
 
+firstArgumentListElement
+options { baseContext = enhancedArgumentListElement; }
+    :   expressionListElement[true]
+    |   namedArg
+    ;
+
 argumentListElement
 options { baseContext = enhancedArgumentListElement; }
     :   expressionListElement[true]
-    |   mapEntry
+    |   namedPropertyArg
+    ;
+
+firstEnhancedArgumentListElement
+options { baseContext = enhancedArgumentListElement; }
+    :   expressionListElement[true]
+    |   standardLambdaExpression
+    |   namedArg
     ;
 
 enhancedArgumentListElement
     :   expressionListElement[true]
     |   standardLambdaExpression
-    |   mapEntry
+    |   namedPropertyArg
     ;
 
 stringLiteral
@@ -1155,10 +1185,6 @@ identifier
     :   Identifier
     |   CapitalizedIdentifier
     |   VAR
-    |
-        // if 'static' followed by DOT, we can treat them as identifiers, e.g. static.unused = { -> }
-        { DOT == _input.LT(2).getType() }?
-        STATIC
     |   IN
 //    |   DEF
     |   TRAIT
@@ -1229,9 +1255,6 @@ keywords
 
 rparen
     :   RPAREN
-    |
-        // !!!Error Alternative, impact the performance of parsing
-        { require(false, "Missing ')'"); }
     ;
 
 nls

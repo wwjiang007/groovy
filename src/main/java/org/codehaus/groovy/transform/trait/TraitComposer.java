@@ -141,9 +141,11 @@ public abstract class TraitComposer {
                 Parameter[] origParams = new Parameter[nParams - 1];
                 Parameter[] params = new Parameter[nParams - 1];
                 System.arraycopy(methodNode.getParameters(), 1, params, 0, params.length);
+
                 MethodNode originalMethod = trait.getMethod(name, params);
-                Map<String, ClassNode> methodGenericsSpec = Optional.ofNullable(originalMethod)
-                    .map(m -> GenericsUtils.addMethodGenerics(m, genericsSpec)).orElse(genericsSpec);
+                Map<String, ClassNode> methodGenericsSpec = GenericsUtils.addMethodGenerics(
+                        Optional.ofNullable(originalMethod).orElse(methodNode), genericsSpec);
+
                 for (int i = 1; i < nParams; i += 1) {
                     Parameter parameter = helperMethodParams[i];
                     ClassNode originType = parameter.getOriginType();
@@ -169,7 +171,7 @@ public abstract class TraitComposer {
                 new Parameter[] {new Parameter(ClassHelper.CLASS_Type,"clazz")}, ClassNode.EMPTY_ARRAY, EmptyStatement.INSTANCE);
         staticInitMethod.setDeclaringClass(helperClassNode);
         staticInitCall.setMethodTarget(staticInitMethod);
-        cNode.addStaticInitializerStatements(Collections.<Statement>singletonList(new ExpressionStatement(
+        cNode.addStaticInitializerStatements(Collections.singletonList(new ExpressionStatement(
                 staticInitCall
         )), false);
         if (fieldHelperClassNode != null && !cNode.declaresInterface(fieldHelperClassNode)) {
@@ -198,7 +200,7 @@ public abstract class TraitComposer {
             for (MethodNode methodNode : declaredMethods) {
                 String fieldName = methodNode.getName();
                 if (fieldName.endsWith(Traits.DIRECT_GETTER_SUFFIX) || fieldName.endsWith(Traits.DIRECT_SETTER_SUFFIX)) {
-                    int suffixIdx = fieldName.lastIndexOf("$");
+                    int suffixIdx = fieldName.lastIndexOf('$');
                     fieldName = fieldName.substring(0, suffixIdx);
                     String operation = methodNode.getName().substring(suffixIdx + 1);
                     boolean getter = "get".equals(operation);
@@ -328,8 +330,6 @@ public abstract class TraitComposer {
                 helperMethodArgList
         );
         mce.setImplicitThis(false);
-
-        genericsSpec = GenericsUtils.addMethodGenerics(helperMethod, genericsSpec);
 
         ClassNode[] exceptionNodes = correctToGenericsSpecRecurse(genericsSpec, copyExceptions(helperMethod.getExceptions()));
         ClassNode fixedReturnType = correctToGenericsSpecRecurse(genericsSpec, helperMethod.getReturnType());

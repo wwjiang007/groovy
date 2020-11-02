@@ -22,19 +22,21 @@
 = Apache Groovy
 The Groovy development team
 :revdate: 24-02-2014
-:build-icon: http://ci.groovy-lang.org:8111/app/rest/builds/buildType:(id:Groovy_Jdk7Build)/statusIcon
+:build-icon: https://ci.groovy-lang.org:8111/app/rest/builds/buildType:(id:Groovy_Jdk7Build)/statusIcon
 :travis-build-icon: https://travis-ci.org/apache/groovy.svg?branch=master
+:sonarcloud-icon: https://sonarcloud.io/api/project_badges/measure?project=apache_groovy&metric=sqale_rating
 :noheader:
 :groovy-www: https://groovy-lang.org/
-:groovy-ci: http://ci.groovy-lang.org?guest=1
+:groovy-ci: https://ci.groovy-lang.org?guest=1
 :travis-ci: https://travis-ci.org/apache/groovy
+:sonarcloud: https://sonarcloud.io/dashboard?id=apache_groovy
 :jdk: https://www.oracle.com/technetwork/java/javase/downloads
 :bintray-latest-version-image: https://api.bintray.com/packages/groovy/maven/groovy/images/download.png
 :bintray-latest-version-link: https://bintray.com/groovy/maven/groovy/_latestVersion
 :bintray-watch-image: https://www.bintray.com/docs/images/bintray_badge_color.png
 :bintray-watch-link: https://bintray.com/groovy/maven/groovy/view?source=watch
 :apache-license-icon: https://img.shields.io/badge/license-APL2-blue.svg
-:apache-license-link: http://www.apache.org/licenses/LICENSE-2.0.txt
+:apache-license-link: https://www.apache.org/licenses/LICENSE-2.0.txt
 :apache-groovy-twitter-icon: https://img.shields.io/twitter/follow/ApacheGroovy.svg?style=social
 :apache-groovy-twitter-link: https://twitter.com/intent/follow?screen_name=ApacheGroovy
 :jdk-icon: https://img.shields.io/badge/java-8+-4c7e9f.svg
@@ -51,12 +53,17 @@ image:{jdk-icon}[jdk, link={jdk}]
 image:{apache-license-icon}[Apache License 2, link={apache-license-link}]
 // image:{build-icon}[teamcity build status, link={groovy-ci}]
 image:{travis-build-icon}[travis build status, link={travis-ci}]
+image:{sonarcloud-icon}[maintainability rating, link={sonarcloud}]
 image:{bintray-download-icon}[bintray download, link={bintray-latest-version-link}]
 image:{apache-groovy-twitter-icon}[follow on Twitter, link={apache-groovy-twitter-link}]
 
-{groovy-www}[Groovy] is a powerful, optionally typed and dynamic language, with static-typing and static compilation capabilities, for the Java platform aimed at multiplying developers’ productivity thanks to a concise, familiar and easy to learn syntax.
+{groovy-www}[Groovy] is a powerful multi-faceted programming language for the JVM platform.
+It supports a spectrum of programming styles incorporating features from dynamic languages such as optional and duck typing, but also
+static compilation and static type checking at levels similar to or greater than Java through its extensible static type checker.
+It aims to greatly increase developer productivity with many powerful features but also a concise, familiar and easy to learn syntax.
 
-It integrates smoothly with any Java program, and immediately delivers to your application powerful features, including scripting capabilities, Domain-Specific Language authoring, runtime and compile-time meta-programming and functional programming. 
+It integrates smoothly with any Java class or library, and immediately delivers to your application powerful capabilities,
+including scripting support, Domain-Specific Language authoring, runtime and compile-time meta-programming and functional programming. 
 
 == Downloading
 
@@ -91,8 +98,8 @@ Simply `git clone` the repo (or the repo you forked via the github website) and 
 Alternatively, you can download the source distribution and unpack it.
 
 If obtaining the source from the source distribution and you intend to build from source,
-you also need to https://gradle.org/downloads/[download] and install http://gradle.org/[Gradle] and
-use the downloaded Gradle to execute one bootstrap step.
+you also need to https://gradle.org/downloads/[download] and install https://gradle.org/[Gradle] and
+use it to execute one bootstrap step.
 
 ==== Bootstrapping Gradle
 
@@ -167,21 +174,9 @@ All code samples of the documentation guide are pulled from actual test cases. T
 
 (Note the omission of package name: class is `semantics.PowerAssertTest` but only `PowerAssertTest` is added to `testSingle`.)
 
-== InvokeDynamic support
-
-The Groovy build supports the JVM instruction `invokedynamic`. If you want to build Groovy with invokedynamic, you can use the project property `indy`:
-
-    gradlew -Pindy=true clean test
-
-Please note that the following Gradle tasks generate both indy and non indy variants of the jars, so you don't need to use the system property:
-
-* dist
-* install
-* uploadArchives
-
 == Continuous Integration Server
 
-The official CI server runs {groovy-ci}[here] and is sponsored by http://www.jetbrains.com[JetBrains].
+The official CI server runs {groovy-ci}[here] and is sponsored by https://www.jetbrains.com[JetBrains].
 
 == Java Profiler
 
@@ -202,13 +197,17 @@ image:{sponsors-silver-img}[]
 
 image:{sponsors-bronze-img}[]
 
-* Thank you to our backers(donating monthly):
+* Thank you to our backers (donating monthly):
 
 image:{backers-monthly-img}[]
 
 * Thank you to all our backers:
 
 image:{backers-all-img}[]
+
+== Stargazers over time
+
+image::https://starcharts.herokuapp.com/apache/groovy.svg[Stargazers over time, link=https://starcharts.herokuapp.com/apache/groovy]
 
 == License
 

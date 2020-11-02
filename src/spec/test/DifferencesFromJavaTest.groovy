@@ -48,50 +48,55 @@ assertEquals(1, result);
         shouldFail {
             assertScript '''
                 // tag::arraycreate_fail[]
-                int[] array = { 1, 2, 3}
+                int[] array = {1, 2, 3};             // Java array initializer shorthand syntax
+                int[] array2 = new int[] {4, 5, 6};  // Java array initializer long syntax
                 // end::arraycreate_fail[]
             '''
         }
         assertScript '''
             // tag::arraycreate_success[]
-            int[] array = [1,2,3]
+            int[] array = [1, 2, 3]
             // end::arraycreate_success[]
+            assert array instanceof int[]
+            // tag::arraycreate3_success[]
+            def array2 = new int[] {1, 2, 3} // Groovy 3.0+ supports the Java-style array initialization long syntax
+            // end::arraycreate3_success[]
+            assert array2 instanceof int[]
         '''
     }
 
     void testPackagePrivate() {
-        assertScript '''import groovy.transform.ASTTest
-import org.codehaus.groovy.control.CompilePhase
+        assertScript '''
+            import groovy.transform.ASTTest
+            import java.lang.reflect.Modifier
 
-import java.lang.reflect.Modifier
+            @ASTTest(phase = CLASS_GENERATION, value = {
+                def field = node.getField('name')
+                assert field.modifiers == Modifier.PRIVATE
+            })
+            // tag::packageprivate_property[]
+            class Person {
+                String name
+            }
+            // end::packageprivate_property[]
+            new Person()
+        '''
 
-@ASTTest(phase = CompilePhase.CLASS_GENERATION, value = {
-    def field = node.getField('name')
-    assert field.modifiers == Modifier.PRIVATE
-})
-// tag::packageprivate_property[]
-class Person {
-    String name
-}
-// end::packageprivate_property[]
-new Person()        '''
+        assertScript '''
+            import groovy.transform.ASTTest
+            import groovy.transform.PackageScope
 
-        assertScript '''import groovy.transform.ASTTest
-import groovy.transform.PackageScope
-import org.codehaus.groovy.control.CompilePhase
-
-import java.lang.reflect.Modifier
-
-@ASTTest(phase = CompilePhase.CLASS_GENERATION, value = {
-    def field = node.getField('name')
-    assert field.modifiers == 0
-})
-// tag::packageprivate_field[]
-class Person {
-    @PackageScope String name
-}
-// end::packageprivate_field[]
-new Person()        '''
+            @ASTTest(phase = CLASS_GENERATION, value = {
+                def field = node.getField('name')
+                assert field.modifiers == 0
+            })
+            // tag::packageprivate_field[]
+            class Person {
+                @PackageScope String name
+            }
+            // end::packageprivate_field[]
+            new Person()
+        '''
     }
 
     void testAnonymousAndNestedClasses() {

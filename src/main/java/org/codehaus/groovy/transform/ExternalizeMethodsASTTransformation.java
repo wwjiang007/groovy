@@ -49,6 +49,8 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.param;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.params;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.stmt;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.varX;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_TRANSIENT;
 
 /**
  * Handles generation of code for the @ExternalizeMethods annotation.
@@ -62,6 +64,7 @@ public class ExternalizeMethodsASTTransformation extends AbstractASTTransformati
     private static final ClassNode OBJECTOUTPUT_TYPE = make(ObjectOutput.class);
     private static final ClassNode OBJECTINPUT_TYPE = make(ObjectInput.class);
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
         AnnotatedNode parent = (AnnotatedNode) nodes[1];

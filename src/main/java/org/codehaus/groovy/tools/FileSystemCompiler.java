@@ -217,7 +217,7 @@ public class FileSystemCompiler {
         File tmpDir = null;
         // if there are any joint compilation options set stubDir if not set
         try {
-            if ((configuration.getJointCompilationOptions() != null)
+            if (configuration.getJointCompilationOptions() != null
                     && !configuration.getJointCompilationOptions().containsKey("stubDir")) {
                 tmpDir = DefaultGroovyStaticMethods.createTempDir(null, "groovy-generated-", "-java-source");
                 configuration.getJointCompilationOptions().put("stubDir", tmpDir);
@@ -319,12 +319,12 @@ public class FileSystemCompiler {
     /**
      * @since 2.5
      */
-    static class VersionProvider implements IVersionProvider {
+    public static class VersionProvider implements IVersionProvider {
         @Override
         public String[] getVersion() {
             return new String[]{
                     "Groovy compiler version " + GroovySystem.getVersion(),
-                    "Copyright 2003-2019 The Apache Software Foundation. http://groovy-lang.org/",
+                    "Copyright 2003-2020 The Apache Software Foundation. http://groovy-lang.org/",
                     "",
             };
         }
@@ -378,9 +378,6 @@ public class FileSystemCompiler {
         @Option(names = "-F", paramLabel = "<flag>", description = "Passed to javac for joint compilation")
         private List<String> flags;
 
-        @Option(names = {"--indy"}, description = "Enables compilation using invokedynamic")
-        private boolean indy;
-
         @Option(names = {"--configscript"}, paramLabel = "<script>", description = "A script for tweaking the configuration options")
         private String configScript;
 
@@ -423,11 +420,6 @@ public class FileSystemCompiler {
                 compilerOptions.put("flags", javacFlags());
                 compilerOptions.put("namedValues", javacNamedValues());
                 configuration.setJointCompilationOptions(compilerOptions);
-            }
-
-            if (indy) {
-                configuration.getOptimizationOptions().put("int", Boolean.FALSE);
-                configuration.getOptimizationOptions().put("indy", Boolean.TRUE);
             }
 
             final List<String> transformations = new ArrayList<>();

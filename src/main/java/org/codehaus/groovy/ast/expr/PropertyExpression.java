@@ -27,79 +27,83 @@ public class PropertyExpression extends Expression {
 
     private Expression objectExpression;
     private final Expression property;
-    private boolean spreadSafe = false;
-    private boolean safe = false;
-    private boolean isStatic = false;
+    private boolean safe;
+    private boolean spreadSafe;
+    private boolean isStatic;
+    private boolean implicitThis;
 
-    private boolean implicitThis = false;
-
-    public boolean isStatic() {
-        return isStatic;
+    public PropertyExpression(final Expression objectExpression, final String propertyName) {
+        this(objectExpression, new ConstantExpression(propertyName), false);
     }
 
-    public PropertyExpression(Expression objectExpression, String property) {
-        this(objectExpression, new ConstantExpression(property), false);
-    }
-    
-    public PropertyExpression(Expression objectExpression, Expression property) {
+    public PropertyExpression(final Expression objectExpression, final Expression property) {
         this(objectExpression, property, false);
     }
 
-    public PropertyExpression(Expression objectExpression, Expression property, boolean safe) {
+    public PropertyExpression(final Expression objectExpression, final Expression property, final boolean safe) {
         this.objectExpression = objectExpression;
         this.property = property;
         this.safe = safe;
     }
 
-    public void visit(GroovyCodeVisitor visitor) {
-        visitor.visitPropertyExpression(this);
-    }
-
-    public boolean isDynamic() {
-        return true;
-    }
-
-    public Expression transformExpression(ExpressionTransformer transformer) {
-        PropertyExpression ret = new PropertyExpression(transformer.transform(objectExpression),
-                transformer.transform(property), safe);
-        ret.setSpreadSafe(spreadSafe);
-        ret.setStatic(isStatic);
-        ret.setImplicitThis(implicitThis);
+    @Override
+    public Expression transformExpression(final ExpressionTransformer transformer) {
+        PropertyExpression ret = new PropertyExpression(transformer.transform(getObjectExpression()), transformer.transform(getProperty()), isSafe());
+        ret.setImplicitThis(this.isImplicitThis());
+        ret.setSpreadSafe(this.isSpreadSafe());
+        ret.setStatic(this.isStatic());
+        ret.setType(this.getType());
         ret.setSourcePosition(this);
         ret.copyNodeMetaData(this);
         return ret;
+    }
+
+    @Override
+    public void visit(final GroovyCodeVisitor visitor) {
+        visitor.visitPropertyExpression(this);
     }
 
     public Expression getObjectExpression() {
         return objectExpression;
     }
 
-    public void setObjectExpression(Expression exp) {
-        objectExpression=exp;
-    }    
-    
+    public void setObjectExpression(final Expression objectExpression) {
+        this.objectExpression = objectExpression;
+    }
+
     public Expression getProperty() {
         return property;
     }
-    
+
     public String getPropertyAsString() {
-        if (property==null) return null;
-        if (! (property instanceof ConstantExpression)) return null;
-        ConstantExpression constant = (ConstantExpression) property;
-        return constant.getText();
+        return getProperty() instanceof ConstantExpression ? getProperty().getText() : null;
     }
 
+    @Override
     public String getText() {
-        String object = objectExpression.getText();
-        String text = property.getText();
-        String spread = isSpreadSafe() ? "*" : "";
-        String safe = isSafe() ? "?" : "";
-        return object + spread + safe + "." + text;
+        StringBuilder sb = new StringBuilder(getObjectExpression().getText());
+        if (isSpreadSafe()) sb.append('*');
+        if (isSafe()) sb.append('?');
+        sb.append('.');
+
+        return sb.append(getProperty().getText()).toString();
+    }
+
+    public boolean isDynamic() {
+        return true;
+    }
+
+    public boolean isImplicitThis() {
+        return implicitThis;
+    }
+
+    public void setImplicitThis(final boolean implicitThis) {
+        this.implicitThis  = implicitThis;
     }
 
     /**
-     * @return is this a safe navigation, i.e. if true then if the source object is null
-     * then this navigation will return null
+     * @return is this a safe navigation, i.e. if true then if the source object
+     * is null then this navigation will return null
      */
     public boolean isSafe() {
         return safe;
@@ -109,23 +113,20 @@ public class PropertyExpression extends Expression {
         return spreadSafe;
     }
 
-    public void setSpreadSafe(boolean value) {
-        spreadSafe = value;
+    public void setSpreadSafe(final boolean spreadSafe) {
+        this.spreadSafe = spreadSafe;
     }
 
+    public boolean isStatic() {
+        return isStatic;
+    }
+
+    public void setStatic(final boolean isStatic) {
+        this.isStatic = isStatic;
+    }
+
+    @Override
     public String toString() {
-        return super.toString() + "[object: " + objectExpression + " property: " + property + "]";
-    }
-
-    public void setStatic(boolean aStatic) {
-        this.isStatic = aStatic;
-    }
-    
-    public boolean isImplicitThis(){
-        return implicitThis;
-    }
-    
-    public void setImplicitThis(boolean it) {
-        implicitThis  = it;
+        return super.toString() + "[object: " + getObjectExpression() + " property: " + getProperty() + "]";
     }
 }

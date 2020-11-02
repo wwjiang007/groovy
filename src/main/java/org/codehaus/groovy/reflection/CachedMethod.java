@@ -47,6 +47,7 @@ public class CachedMethod extends MetaMethod implements Comparable {
 
     private final Method cachedMethod;
     private int hashCode;
+    private CachedMethod transformedMethod;
 
     private static final MyComparator COMPARATOR = new MyComparator();
 
@@ -78,40 +79,28 @@ public class CachedMethod extends MetaMethod implements Comparable {
         return methods[i];
     }
 
+    @Override
     public Class[] getPT() {
         return cachedMethod.getParameterTypes();
     }
 
+    @Override
     public String getName() {
         return cachedMethod.getName();
     }
 
+    @Override
     public String getDescriptor() {
         return BytecodeHelper.getMethodDescriptor(getReturnType(), getNativeParameterTypes());
     }
 
+    @Override
     public CachedClass getDeclaringClass() {
         return cachedClass;
     }
 
+    @Override
     public final Object invoke(Object object, Object[] arguments) {
-        /*
-        CachedMethod transformedCachedMethod =
-                (CachedMethod) CallSiteHelper.transformMetaMethod(
-                        InvokerHelper.getMetaClass(object.getClass()),
-                        this,
-                        this.getPT(),
-                        CachedMethod.class);
-
-        Method cachedMethod = transformedCachedMethod.cachedMethod;
-
-        if (transformedCachedMethod == this) {
-            makeAccessibleIfNecessary();
-        } else {
-            ReflectionUtils.trySetAccessible(cachedMethod);
-        }
-        */
-
         makeAccessibleIfNecessary();
 
         try {
@@ -134,6 +123,7 @@ public class CachedMethod extends MetaMethod implements Comparable {
         return null;
     }
 
+    @Override
     public Class getReturnType() {
         return cachedMethod.getReturnType();
     }
@@ -142,11 +132,13 @@ public class CachedMethod extends MetaMethod implements Comparable {
         return getParameterTypes().length;
     }
 
+    @Override
     public int getModifiers() {
         return cachedMethod.getModifiers();
     }
 
 
+    @Override
     public String getSignature() {
         return getName() + getDescriptor();
     }
@@ -162,10 +154,20 @@ public class CachedMethod extends MetaMethod implements Comparable {
         return cachedMethod;
     }
 
+    @Override
     public boolean isStatic() {
         return MethodHelper.isStatic(cachedMethod);
     }
 
+    public CachedMethod getTransformedMethod() {
+        return transformedMethod;
+    }
+
+    public void setTransformedMethod(CachedMethod transformedMethod) {
+        this.transformedMethod = transformedMethod;
+    }
+
+    @Override
     public int compareTo(Object o) {
       if (o instanceof CachedMethod)
         return compareToCachedMethod((CachedMethod)o);
@@ -233,11 +235,13 @@ public class CachedMethod extends MetaMethod implements Comparable {
         return 0;
     }
 
+    @Override
     public boolean equals(Object o) {
         return (o instanceof CachedMethod && cachedMethod.equals(((CachedMethod)o).cachedMethod))
                 || (o instanceof Method && cachedMethod.equals(o));
     }
 
+    @Override
     public int hashCode() {
         if (hashCode == 0) {
            hashCode = cachedMethod.hashCode();
@@ -247,6 +251,7 @@ public class CachedMethod extends MetaMethod implements Comparable {
         return hashCode;
     }
 
+    @Override
     public String toString() {
         return cachedMethod.toString();
     }
@@ -345,6 +350,7 @@ public class CachedMethod extends MetaMethod implements Comparable {
     private static class MyComparator implements Comparator, Serializable {
         private static final long serialVersionUID = 8909277090690131302L;
 
+        @Override
         public int compare(Object o1, Object o2) {
             if (o1 instanceof CachedMethod)
                 return ((CachedMethod)o1).compareTo(o2);

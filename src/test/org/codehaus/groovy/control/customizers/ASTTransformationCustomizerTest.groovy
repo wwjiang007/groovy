@@ -20,29 +20,21 @@ package org.codehaus.groovy.control.customizers
 
 import groovy.test.GroovyTestCase
 import groovy.transform.TimedInterrupt
-import org.codehaus.groovy.ast.ClassHelper
-import org.codehaus.groovy.ast.expr.ClassExpression
-import org.codehaus.groovy.ast.expr.PropertyExpression
-import org.codehaus.groovy.control.CompilerConfiguration
 import groovy.util.logging.Log
-
-import java.util.concurrent.TimeUnit
-import java.util.logging.Logger
+import org.codehaus.groovy.ast.ASTNode
+import org.codehaus.groovy.ast.ClassHelper
+import org.codehaus.groovy.control.CompilePhase
+import org.codehaus.groovy.control.CompilerConfiguration
+import org.codehaus.groovy.control.SourceUnit
 import org.codehaus.groovy.transform.ASTTransformation
 import org.codehaus.groovy.transform.GroovyASTTransformation
-import org.codehaus.groovy.control.CompilePhase
+
+import java.util.concurrent.TimeUnit
 import java.util.concurrent.atomic.AtomicBoolean
-import org.codehaus.groovy.ast.ASTNode
-import org.codehaus.groovy.control.SourceUnit
-import java.lang.annotation.Retention
-import java.lang.annotation.Target
-import org.codehaus.groovy.transform.GroovyASTTransformationClass
-import java.lang.annotation.ElementType
-import java.lang.annotation.RetentionPolicy
-import org.codehaus.groovy.ast.ClassNode
-import org.objectweb.asm.Opcodes
-import org.codehaus.groovy.ast.builder.AstBuilder
-import groovy.transform.ConditionalInterrupt
+import java.util.logging.Logger
+
+import static org.codehaus.groovy.ast.tools.GeneralUtils.classX
+import static org.codehaus.groovy.ast.tools.GeneralUtils.propX
 
 /**
  * Tests the {@link ASTTransformationCustomizer}.
@@ -97,62 +89,6 @@ class ASTTransformationCustomizerTest extends GroovyTestCase {
         }
     }
 
-    void testLocalTransformationWithClosureAnnotationParameter() {
-        // add @Contract({distance = 1 })
-        customizer = new ASTTransformationCustomizer(Contract)
-        final expression = new AstBuilder().buildFromCode(CompilePhase.CONVERSION) {->
-            distance = 1
-        }.expression[0]
-        customizer.annotationParameters = [value: expression]
-        configuration.addCompilationCustomizers(customizer)
-        def shell = new GroovyShell(configuration)
-        def result = shell.evaluate("""
-            class MyClass {
-                int distance
-                MyClass() {}
-            }
-            new MyClass()
-        """)
-        assert result.distance == 1
-    }
-
-    void testLocalTransformationWithClosureAnnotationParameter_notAnnotatedAsASTInterface() {
-        // add @Contract2({distance = 1 })
-        customizer = new ASTTransformationCustomizer(Contract2, "org.codehaus.groovy.control.customizers.ContractAnnotation")
-        final expression = new AstBuilder().buildFromCode(CompilePhase.CONVERSION) {->
-            distance = 1
-        }.expression[0]
-        customizer.annotationParameters = [value: expression]
-        configuration.addCompilationCustomizers(customizer)
-        def shell = new GroovyShell(configuration)
-        def result = shell.evaluate("""
-            class MyClass {
-                int distance
-                MyClass() {}
-            }
-            new MyClass()
-        """)
-        assert result.distance == 1
-    }
-
-    void testLocalTransformationWithClassAnnotationParameter() {
-        // add @ConditionalInterrupt(value={ true }, thrown=SecurityException)
-        final expression = new AstBuilder().buildFromCode(CompilePhase.CONVERSION) {->
-            true
-        }.expression[0]
-        customizer = new ASTTransformationCustomizer(ConditionalInterrupt, value:expression, thrown:SecurityException)
-        configuration.addCompilationCustomizers(customizer)
-        def shell = new GroovyShell(configuration)
-        shouldFail(SecurityException) {
-            shell.evaluate("""
-                class MyClass {
-                    void doIt() { }
-                }
-                new MyClass().doIt()
-            """)
-        }
-    }
-
     void testGlobalTransformation() {
         final TestTransformation transformation = new TestTransformation()
         customizer = new ASTTransformationCustomizer(transformation)
@@ -186,21 +122,23 @@ class ASTTransformationCustomizerTest extends GroovyTestCase {
     }
 
     void testAnyExpressionAsParameterValue() {
-        customizer = new ASTTransformationCustomizer(value:100, unit: new PropertyExpression(new ClassExpression(ClassHelper.make(TimeUnit)),'MILLISECONDS'), TimedInterrupt)
+        customizer = new ASTTransformationCustomizer(value:200, unit: propX(classX(ClassHelper.make(TimeUnit)),'MILLISECONDS'), TimedInterrupt)
         configuration.addCompilationCustomizers(customizer)
         def shell = new GroovyShell(configuration)
-        def result = shell.evaluate '''import java.util.concurrent.TimeoutException
+        def result = shell.evaluate '''
+            import java.util.concurrent.TimeoutException
 
-boolean interrupted = false
-try {
-    100.times {
-        Thread.sleep(100)
-    }
-} catch (TimeoutException e) {
-    interrupted = true
-}
+            boolean interrupted = false
+            try {
+                10.times {
+                    sleep 100
+                }
+            } catch (TimeoutException ignore) {
+                interrupted = true
+            }
 
-interrupted'''
+            interrupted
+        '''
         assert result
     }
 
@@ -217,26 +155,4 @@ interrupted'''
         
     }
 
-}
-
-@Retention(RetentionPolicy.SOURCE)
-@Target([ElementType.TYPE])
-@GroovyASTTransformationClass("org.codehaus.groovy.control.customizers.ContractAnnotation")
-protected @interface Contract {
-    Class value();
-}
-
-@GroovyASTTransformation(phase=CompilePhase.CONVERSION)
-protected class ContractAnnotation implements ASTTransformation, Opcodes {
-    void visit(ASTNode[] nodes, SourceUnit source) {
-        def node = nodes[0]
-        def member = node.getMember("value")
-        ((ClassNode)nodes[1]).getDeclaredConstructors()[0].code = member.code
-    }
-}
-
-@Retention(RetentionPolicy.SOURCE)
-@Target([ElementType.TYPE])
-protected @interface Contract2 {
-    Class value();
 }

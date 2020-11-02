@@ -41,6 +41,24 @@ class ClassTest extends GroovyTestCase {
         '''
     }
 
+    void testInnerInstantiation() {
+        assertScript '''
+            // tag::inner_instantiation[]
+            class Computer {
+                class Cpu {
+                    int coreNumber
+            
+                    Cpu(int coreNumber) {
+                        this.coreNumber = coreNumber
+                    }
+                }
+            }
+
+            assert 4 == new Computer().new Cpu(4).coreNumber
+            // end::inner_instantiation[]
+        '''
+    }
+
     void testInnerClass() {
         assertScript '''
             // tag::inner_class[]
@@ -545,7 +563,7 @@ class ClassTest extends GroovyTestCase {
             class Runner {
                 static <T> T run(Class<T> taskClass) {
                     def tasks = taskClass.newInstance()                                         // <1>
-                    def params = [jdk:6, windows: false]                                        // <2>
+                    def params = [jdk: 6, windows: false]                                       // <2>
                     tasks.class.declaredMethods.each { m ->                                     // <3>
                         if (Modifier.isPublic(m.modifiers) && m.parameterTypes.length == 0) {   // <4>
                             def onlyIf = m.getAnnotation(OnlyIf)                                // <5>

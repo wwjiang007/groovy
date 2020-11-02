@@ -16,39 +16,32 @@
  *  specific language governing permissions and limitations
  *  under the License.
  */
-repositories {
-    maven {
-        url 'https://oss.sonatype.org/content/repositories/snapshots'
-    }
+plugins {
+    id 'org.apache.groovy-library'
 }
 
 dependencies {
-    implementation rootProject
-    api project(':groovy-xml')
-    testImplementation rootProject.sourceSets.test.runtimeClasspath
+    api rootProject // Template uses Writable...
+    implementation project(':groovy-xml')
     testImplementation project(':groovy-test')
-    // temporarily disable spock tests since it doesn't support 4 yet
-    if (!spockVersion.startsWith('1.3') || !groovyVersion.startsWith('4')) {
-        testImplementation ("org.spockframework:spock-core:$spockVersion") {
-            exclude group: 'org.codehaus.groovy'
-        }
+    testImplementation ("org.spockframework:spock-core:${versions.spock}") {
+        exclude group: 'org.codehaus.groovy'
+    }
+    testRuntimeOnly("org.junit.vintage:junit-vintage-engine:${versions.junit5}") {
+        because 'for JUnit 3/4 tests as well as JUnit 5'
     }
 }
 
-// temporarily disable spock tests since it doesn't support 4 yet
-if (spockVersion.startsWith('1.3') && groovyVersion.startsWith('4')) {
-    sourceSets {
-        test {
-            groovy {
-                exclude 'groovy/text/StreamingTemplateEngineSpecification.groovy'
-            }
-        }
-    }
+tasks.named('test') {
+    useJUnitPlatform()
+    systemProperty "spock.iKnowWhatImDoing.disableGroovyVersionCheck", "true"
 }
 
-task backportJar(type:Jar) {
-    appendix = 'markup-backport'
-    dependsOn classes
-    from sourceSets.main.output
-    include 'groovy/text/markup/**'
+tasks.named('rat') {
+    excludes += [
+            // test files
+            'src/spec/test-resources/*.txt',
+            'src/test/resources/includes/hello-escaped.txt',
+            'src/test/resources/includes/hello.html'
+    ]
 }

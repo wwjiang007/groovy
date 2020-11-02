@@ -81,6 +81,7 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
      * Property invocations done on 'this' reference are transformed so that the invocations at runtime are
      * done on the additional parameter 'self'
      */
+    @Override
     public void visit(ASTNode[] nodes, final SourceUnit source) {
         if (nodes.length != 2 || !(nodes[0] instanceof AnnotationNode) || !(nodes[1] instanceof ClassNode)) {
             source.getErrorCollector().addError(
@@ -108,6 +109,7 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
 
         final Reference parameter = new Reference();
         final ClassCodeExpressionTransformer expressionTransformer = new ClassCodeExpressionTransformer() {
+            @Override
             protected SourceUnit getSourceUnit() {
                 return source;
             }
@@ -194,7 +196,9 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
                         return thisExpression;
                     else {
                         if (!varStack.getLast().contains(ve.getName())) {
-                            return new PropertyExpression(thisExpression, ve.getName());
+                            PropertyExpression transformed = new PropertyExpression(thisExpression, ve.getName());
+                            transformed.setSourcePosition(ve);
+                            return transformed;
                         }
                     }
                 } else if (exp instanceof PropertyExpression) {
@@ -258,16 +262,9 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
     }
 
     private static void addUnsupportedError(ASTNode node, SourceUnit unit) {
-        unit.getErrorCollector().addErrorAndContinue(
-                new SyntaxErrorMessage(
-                        new SyntaxException("The @Category transformation does not support instance "+
-                                (node instanceof FieldNode?"fields":"properties")
-                                + " but found ["+getName(node)+"]",
-                                node.getLineNumber(),
-                                node.getColumnNumber()
-
-                        ), unit
-                ));
+        unit.getErrorCollector().addErrorAndContinue("The @Category transformation does not support instance "+
+                (node instanceof FieldNode?"fields":"properties")
+                + " but found ["+getName(node)+"]", node, unit);
     }
 
     private static String getName(ASTNode node) {
@@ -280,10 +277,7 @@ public class CategoryASTTransformation implements ASTTransformation, Opcodes {
         Expression value = annotation.getMember("value");
         if (!(value instanceof ClassExpression)) {
             //noinspection ThrowableInstanceNeverThrown
-            source.getErrorCollector().addErrorAndContinue(new SyntaxErrorMessage(
-                    new SyntaxException("@groovy.lang.Category must define 'value' which is the class to apply this category to",
-                            annotation.getLineNumber(), annotation.getColumnNumber(), annotation.getLastLineNumber(), annotation.getLastColumnNumber()),
-                    source));
+            source.getErrorCollector().addErrorAndContinue("@groovy.lang.Category must define 'value' which is the class to apply this category to", annotation, source);
             return null;
         } else {
             ClassExpression ce = (ClassExpression) value;

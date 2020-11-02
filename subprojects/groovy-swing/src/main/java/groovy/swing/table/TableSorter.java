@@ -18,7 +18,7 @@
  */
 package groovy.swing.table;
 
-import javax.swing.*;
+import javax.swing.JTable;
 import javax.swing.event.TableModelEvent;
 import javax.swing.table.JTableHeader;
 import javax.swing.table.TableColumnModel;
@@ -29,7 +29,9 @@ import java.util.Date;
 import java.util.Vector;
 
 /**
- * A sorter for TableModels. The sorter has a model (conforming to TableModel)
+ * A sorter for TableModels.
+ * <p>
+ * The sorter has a model (conforming to TableModel)
  * and itself implements TableModel. TableSorter does not store or copy
  * the data in the TableModel, instead it maintains an array of
  * integers which it keeps the same size as the number of rows in its
@@ -44,8 +46,8 @@ import java.util.Vector;
  */
 public class TableSorter extends TableMap {
     private static final int[] EMPTY_INT_ARRAY = new int[0];
-    int indexes[];
-    Vector sortingColumns = new Vector();
+    int[] indexes;
+    Vector<Integer> sortingColumns = new Vector<>();
     boolean ascending = true;
     int lastSortedColumn = -1;
 
@@ -57,13 +59,14 @@ public class TableSorter extends TableMap {
         setModel(model);
     }
 
+    @Override
     public void setModel(TableModel model) {
         super.setModel(model);
         reallocateIndexes();
     }
 
     public int compareRowsByColumn(int row1, int row2, int column) {
-        Class type = model.getColumnClass(column);
+        Class<?> type = model.getColumnClass(column);
         TableModel data = model;
 
         // Check for nulls
@@ -80,12 +83,12 @@ public class TableSorter extends TableMap {
             return 1;
         }
 
-/* We copy all returned values from the getValue call in case
-an optimised model is reusing one object to return many values.
-The Number subclasses in the JDK are immutable and so will not be used in
-this way but other subclasses of Number might want to do this to save
-space and avoid unnecessary heap allocation.
-*/
+        /* We copy all returned values from the getValue call in case
+        an optimised model is reusing one object to return many values.
+        The Number subclasses in the JDK are immutable and so will not be used in
+        this way but other subclasses of Number might want to do this to save
+        space and avoid unnecessary heap allocation.
+        */
         if (type.getSuperclass() == java.lang.Number.class) {
             return compareNumbers(data, row1, column, row2);
         }
@@ -119,10 +122,8 @@ space and avoid unnecessary heap allocation.
     }
 
     private static int compareBooleans(TableModel data, int row1, int column, int row2) {
-        Boolean bool1 = (Boolean) data.getValueAt(row1, column);
-        boolean b1 = bool1;
-        Boolean bool2 = (Boolean) data.getValueAt(row2, column);
-        boolean b2 = bool2;
+        boolean b1 = (Boolean) data.getValueAt(row1, column);
+        boolean b2 = (Boolean) data.getValueAt(row2, column);
 
         if (b1 == b2)
             return 0;
@@ -191,6 +192,7 @@ space and avoid unnecessary heap allocation.
             indexes[row] = row;
     }
 
+    @Override
     public void tableChanged(TableModelEvent e) {
         reallocateIndexes();
 
@@ -225,11 +227,11 @@ space and avoid unnecessary heap allocation.
     // arrays. The number of compares appears to vary between N-1 and
     // NlogN depending on the initial order but the main reason for
     // using it here is that, unlike qsort, it is stable.
-    public void shuttlesort(int from[], int to[], int low, int high) {
+    public void shuttlesort(int[] from, int[] to, int low, int high) {
         if (high - low < 2) {
             return;
         }
-        int middle = (low + high) / 2;
+        int middle = (low + high) >>> 1;
         shuttlesort(to, from, low, middle);
         shuttlesort(to, from, middle, high);
 
@@ -276,11 +278,13 @@ space and avoid unnecessary heap allocation.
     // The mapping only affects the contents of the data rows.
     // Pass all requests to these rows through the mapping array: "indexes".
 
+    @Override
     public Object getValueAt(int aRow, int aColumn) {
         checkModel();
         return model.getValueAt(indexes[aRow], aColumn);
     }
 
+    @Override
     public void setValueAt(Object aValue, int aRow, int aColumn) {
         checkModel();
         model.setValueAt(aValue, indexes[aRow], aColumn);
@@ -298,7 +302,7 @@ space and avoid unnecessary heap allocation.
         super.tableChanged(new TableModelEvent(this));
     }
 
-    // There is no-where else to put this.
+    // There is nowhere else to put this.
     // Add a mouse listener to the Table to trigger a table sort
     // when a column heading is clicked in the JTable.
     public void addMouseListenerToHeaderInTable(JTable table) {
@@ -306,6 +310,7 @@ space and avoid unnecessary heap allocation.
         final JTable tableView = table;
         tableView.setColumnSelectionAllowed(false);
         MouseAdapter listMouseListener = new MouseAdapter() {
+            @Override
             public void mouseClicked(MouseEvent e) {
                 TableColumnModel columnModel = tableView.getColumnModel();
                 int viewColumn = columnModel.getColumnIndexAtX(e.getX());
@@ -321,6 +326,4 @@ space and avoid unnecessary heap allocation.
         th.addMouseListener(listMouseListener);
     }
 
-
 }
-

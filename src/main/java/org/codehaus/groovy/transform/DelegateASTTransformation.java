@@ -43,11 +43,13 @@ import org.codehaus.groovy.control.SourceUnit;
 
 import java.lang.reflect.Modifier;
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
 import static org.apache.groovy.ast.tools.ClassNodeUtils.addGeneratedMethod;
+import static org.apache.groovy.util.BeanUtils.capitalize;
 import static org.codehaus.groovy.ast.ClassHelper.make;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.assignS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.callThisX;
@@ -55,6 +57,7 @@ import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getAllMethods;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getAllProperties;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.getInterfacesAndSuperInterfaces;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.getSetterName;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.params;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.propX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.returnS;
@@ -65,6 +68,11 @@ import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpec;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.correctToGenericsSpecRecurse;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.createGenericsSpec;
 import static org.codehaus.groovy.ast.tools.GenericsUtils.extractSuperClassGenerics;
+import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_NATIVE;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 
 /**
  * Handles generation of code for the <code>@Delegate</code> annotation
@@ -89,6 +97,7 @@ public class DelegateASTTransformation extends AbstractASTTransformation {
     private static final String MEMBER_METHOD_ANNOTATIONS = "methodAnnotations";
     private static final String MEMBER_ALL_NAMES = "allNames";
 
+    @Override
     public void visit(ASTNode[] nodes, SourceUnit source) {
         init(nodes, source);
 
@@ -203,11 +212,22 @@ public class DelegateASTTransformation extends AbstractASTTransformation {
         if (propertyNameList == null || propertyNameList.isEmpty()) {
             return true;
         }
-        final List<String> pNames = new ArrayList<>();
+        final Set<String> pNames = new HashSet<>();
+        final Set<String> mNames = new HashSet<>();
         for (PropertyNode pNode : BeanUtils.getAllProperties(cNode, false, false, false)) {
-            pNames.add(pNode.getField().getName());
+            String name = pNode.getField().getName();
+            pNames.add(name);
+            // add getter/setters since Groovy compiler hasn't added property accessors yet
+            if ((pNode.getModifiers() & ACC_FINAL) == 0) {
+                mNames.add(getSetterName(name));
+            }
+            String capitalized = capitalize(name);
+            mNames.add("get" + capitalized);
+            boolean isPrimBool = pNode.getOriginType().equals(ClassHelper.boolean_TYPE);
+            if (isPrimBool) {
+                mNames.add("is" + capitalized);
+            }
         }
-        final List<String> mNames = new ArrayList<>();
         for (MethodNode mNode : cNode.getAllDeclaredMethods()) {
             mNames.add(mNode.getName());
         }
@@ -362,7 +382,7 @@ public class DelegateASTTransformation extends AbstractASTTransformation {
             newMethod.setGenericsTypes(candidate.getGenericsTypes());
 
             if (memberHasValue(delegate.annotation, MEMBER_METHOD_ANNOTATIONS, true)) {
-                newMethod.addAnnotations(copyAnnotatedNodeAnnotations(candidate, MY_TYPE_NAME));
+                newMethod.addAnnotations(copyAnnotatedNodeAnnotations(candidate, MY_TYPE_NAME, false));
             }
         }
     }

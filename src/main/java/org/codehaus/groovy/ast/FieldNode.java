@@ -19,14 +19,21 @@
 package org.codehaus.groovy.ast;
 
 import org.codehaus.groovy.ast.expr.Expression;
-import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.Field;
+
+import static org.objectweb.asm.Opcodes.ACC_ENUM;
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PRIVATE;
+import static org.objectweb.asm.Opcodes.ACC_PROTECTED;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.ACC_VOLATILE;
 
 /**
  * Represents a field (member variable)
  */
-public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
+public class FieldNode extends AnnotatedNode implements Variable {
 
     private String name;
     private int modifiers;
@@ -42,6 +49,8 @@ public class FieldNode extends AnnotatedNode implements Opcodes, Variable {
         ClassNode fldType = ClassHelper.make(field.getType());
         return new FieldNode(name, ACC_PUBLIC | ACC_STATIC, fldType, ClassHelper.make(theClass), null);
     }
+
+    protected FieldNode() {}
 
     public FieldNode(String name, int modifiers, ClassNode type, ClassNode owner, Expression initialValueExpression) {
         this.name = name;

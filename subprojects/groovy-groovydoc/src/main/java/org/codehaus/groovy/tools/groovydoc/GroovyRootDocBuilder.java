@@ -22,18 +22,20 @@ import org.apache.groovy.groovydoc.tools.GroovyDocUtil;
 import org.codehaus.groovy.groovydoc.GroovyClassDoc;
 import org.codehaus.groovy.groovydoc.GroovyRootDoc;
 import org.codehaus.groovy.runtime.ResourceGroovyMethods;
+import org.codehaus.groovy.tools.groovydoc.antlr4.GroovyDocParser;
 import org.codehaus.groovy.tools.shell.util.Logger;
 
 import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Locale;
 import java.util.Map;
 import java.util.Properties;
 import java.util.regex.Pattern;
 
-import static org.apache.groovy.util.SystemUtil.getSystemPropertySafe;
 import static org.codehaus.groovy.tools.groovydoc.SimpleGroovyClassDoc.CODE_REGEX;
 import static org.codehaus.groovy.tools.groovydoc.SimpleGroovyClassDoc.LINK_REGEX;
 import static org.codehaus.groovy.tools.groovydoc.SimpleGroovyClassDoc.TAG_REGEX;
@@ -55,7 +57,7 @@ public class GroovyRootDocBuilder {
     }
 
     public GroovyRootDocBuilder(String[] sourcepaths, List<LinkArgument> links, Properties properties) {
-        this.sourcepaths = sourcepaths;
+        this.sourcepaths = sourcepaths == null ? null : Arrays.copyOf(sourcepaths, sourcepaths.length);
         this.links = links;
         this.rootDoc = new SimpleGroovyRootDoc("root");
         this.properties = properties;
@@ -119,12 +121,7 @@ public class GroovyRootDocBuilder {
             return;
         }
         try {
-            // TODO reinstate and remove preview sys property once stable
-//            final boolean newParser = Boolean.parseBoolean(getSystemPropertySafe("groovy.antlr4", "true"));
-            final boolean newParser = Boolean.parseBoolean(getSystemPropertySafe("preview.groovydoc.antlr4", "false"));
-
-            GroovyDocParserI docParser = newParser ? new org.codehaus.groovy.tools.groovydoc.antlr4.GroovyDocParser(links, properties)
-                    : new GroovyDocParser(links, properties);
+            GroovyDocParserI docParser = new GroovyDocParser(links, properties);
             Map<String, GroovyClassDoc> classDocs = docParser.getClassDocsFromSingleSource(packagePath, file, src);
             rootDoc.putAllClasses(classDocs);
             if (isAbsolute) {
@@ -182,7 +179,7 @@ public class GroovyRootDocBuilder {
         result = replaceAllTags(result, "<TT>", "</TT>", CODE_REGEX, relPath);
 
         // hack to reformat other groovydoc block tags (@see, @return, @param, @throws, @author, @since) into html
-        result = replaceAllTags(result + "@endMarker", "<DL><DT><B>$1:</B></DT><DD>", "</DD></DL>", TAG_REGEX, relPath);
+        result = replaceAllTags(result + " @endMarker", "<DL><DT><B>$1:</B></DT><DD>", "</DD></DL>", TAG_REGEX, relPath);
         // remove @endMarker
         result = result.substring(0, result.length() - 10);
 
@@ -217,14 +214,14 @@ public class GroovyRootDocBuilder {
     }
 
     private static String pruneTagFromFront(String description, String tag) {
-        int index = Math.max(indexOfTag(description, tag.toLowerCase()), indexOfTag(description, tag.toUpperCase()));
+        int index = Math.max(indexOfTag(description, tag.toLowerCase(Locale.ENGLISH)), indexOfTag(description, tag.toUpperCase(Locale.ENGLISH)));
         if (index < 0) return description;
         return description.substring(index);
     }
 
     private static String pruneTagFromEnd(String description, String tag) {
-        int index = Math.max(description.lastIndexOf("<" + tag.toLowerCase() + ">"),
-                description.lastIndexOf("<" + tag.toUpperCase() + ">"));
+        int index = Math.max(description.lastIndexOf("<" + tag.toLowerCase(Locale.ENGLISH) + ">"),
+                description.lastIndexOf("<" + tag.toUpperCase(Locale.ENGLISH) + ">"));
         if (index < 0) return description;
         return description.substring(0, index);
     }

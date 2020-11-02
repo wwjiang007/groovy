@@ -27,8 +27,13 @@ import org.codehaus.groovy.control.ErrorCollector;
 import org.codehaus.groovy.control.Phases;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.groovydoc.GroovyClassDoc;
+import org.codehaus.groovy.groovydoc.GroovyFieldDoc;
+import org.codehaus.groovy.groovydoc.GroovyMethodDoc;
 import org.codehaus.groovy.tools.groovydoc.GroovyDocParserI;
 import org.codehaus.groovy.tools.groovydoc.LinkArgument;
+import org.codehaus.groovy.tools.groovydoc.SimpleGroovyClassDoc;
+import org.codehaus.groovy.tools.groovydoc.SimpleGroovyFieldDoc;
+import org.codehaus.groovy.tools.groovydoc.SimpleGroovyMethodDoc;
 import org.codehaus.groovy.tools.shell.util.Logger;
 
 import java.util.List;
@@ -45,6 +50,7 @@ public class GroovyDocParser implements GroovyDocParserI {
         this.properties = properties;
     }
 
+    @Override
     public Map<String, GroovyClassDoc> getClassDocsFromSingleSource(String packagePath, String file, String src)
             throws RuntimeException {
         if (file.indexOf(".java") > 0) { // simple (for now) decision on java or groovy
@@ -60,7 +66,14 @@ public class GroovyDocParser implements GroovyDocParserI {
 
     private Map<String, GroovyClassDoc> parseJava(String packagePath, String file, String src) throws RuntimeException {
         GroovydocJavaVisitor visitor = new GroovydocJavaVisitor(packagePath, links);
-        visitor.visit(StaticJavaParser.parse(src), null);
+        try {
+            visitor.visit(StaticJavaParser.parse(src), null);
+        } catch(Throwable t) {
+            System.err.println("Attempting to ignore error parsing Java source file: " + packagePath + "/" + file);
+            System.err.println("Consider reporting the error to the Groovy project: https://issues.apache.org/jira/browse/GROOVY");
+            System.err.println("... or directly to the JavaParser project: https://github.com/javaparser/javaparser/issues");
+            System.err.println("Error: " + t.getMessage());
+        }
         return visitor.getGroovyClassDocs();
     }
 
@@ -70,11 +83,26 @@ public class GroovyDocParser implements GroovyDocParserI {
         CompilationUnit compUnit = new CompilationUnit(config);
         SourceUnit unit = new SourceUnit(file, src, config, null, new ErrorCollector(config));
         compUnit.addSource(unit);
-        compUnit.compile(Phases.SEMANTIC_ANALYSIS);
+        compUnit.compile(Phases.CONVERSION);
         ModuleNode root = unit.getAST();
         GroovydocVisitor visitor = new GroovydocVisitor(unit, packagePath, links);
         visitor.visitClass(root.getClasses().get(0));
         return visitor.getGroovyClassDocs();
+    }
+
+    private void replaceTags(SimpleGroovyClassDoc sgcd) {
+        sgcd.setRawCommentText(sgcd.replaceTags(sgcd.getRawCommentText()));
+        for (GroovyMethodDoc groovyMethodDoc : sgcd.methods()) {
+            SimpleGroovyMethodDoc sgmd = (SimpleGroovyMethodDoc) groovyMethodDoc;
+            sgmd.setRawCommentText(sgcd.replaceTags(sgmd.getRawCommentText()));
+        }
+        for (GroovyFieldDoc groovyFieldDoc : sgcd.isEnum() ? sgcd.enumConstants() : sgcd.fields()) {
+            SimpleGroovyFieldDoc sgfd = (SimpleGroovyFieldDoc) groovyFieldDoc;
+            sgfd.setRawCommentText(sgcd.replaceTags(sgfd.getRawCommentText()));
+        }
+        for (GroovyClassDoc innerClassDoc : sgcd.innerClasses()) {
+            replaceTags((SimpleGroovyClassDoc) innerClassDoc);
+        }
     }
 
 }

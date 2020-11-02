@@ -54,6 +54,7 @@ import java.util.Map;
 public class MapEntryOrKeyValue extends ClosureSignatureHint {
     private static final ClassNode MAPENTRY_TYPE = ClassHelper.make(Map.Entry.class);
 
+    @Override
     public List<ClassNode[]> getClosureSignatures(final MethodNode node, final SourceUnit sourceUnit, final CompilationUnit compilationUnit, final String[] options, final ASTNode usage) {
         Options opt;
         try {
@@ -105,7 +106,7 @@ public class MapEntryOrKeyValue extends ClosureSignatureHint {
                     if ("argNum".equals(key)) {
                         pIndex = Integer.parseInt(value);
                     } else if ("index".equals(key)) {
-                        generateIndex = Boolean.valueOf(value);
+                        generateIndex = Boolean.parseBoolean(value);
                     } else {
                         throw new IncorrectTypeHintException(mn, "Unrecognized option: "+key, source.getLineNumber(), source.getColumnNumber());
                     }

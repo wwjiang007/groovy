@@ -21,7 +21,6 @@ package org.codehaus.groovy.reflection;
 import org.objectweb.asm.ClassReader;
 import org.objectweb.asm.ClassWriter;
 import org.objectweb.asm.MethodVisitor;
-import org.objectweb.asm.Opcodes;
 
 import java.io.IOException;
 import java.io.InputStream;
@@ -30,11 +29,17 @@ import java.security.PrivilegedAction;
 import java.util.HashMap;
 import java.util.Map;
 
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ALOAD;
+import static org.objectweb.asm.Opcodes.INVOKESPECIAL;
+import static org.objectweb.asm.Opcodes.RETURN;
+import static org.objectweb.asm.Opcodes.V1_4;
+
 /**
  * Special class loader, which when running on Sun VM allows to generate accessor classes for any method
  */
-public class SunClassLoader extends ClassLoader implements Opcodes {
-    protected final Map<String,Class> knownClasses = new HashMap<String,Class>();
+public class SunClassLoader extends ClassLoader {
+    protected final Map<String, Class> knownClasses = new HashMap<String, Class>();
 
     protected static final SunClassLoader sunVM;
 
@@ -48,30 +53,29 @@ public class SunClassLoader extends ClassLoader implements Opcodes {
                     return null;
                 }
             });
-        }
-        catch (Throwable e) {
+        } catch (Throwable e) {
             res = null;
         }
         sunVM = res;
     }
 
     protected SunClassLoader() throws Throwable {
-        super (SunClassLoader.class.getClassLoader());
+        super(SunClassLoader.class.getClassLoader());
 
         final Class magic = ClassLoader.getSystemClassLoader().loadClass("sun.reflect.MagicAccessorImpl");
         knownClasses.put("sun.reflect.MagicAccessorImpl", magic);
-        loadMagic ();
+        loadMagic();
     }
 
     private void loadMagic() {
         ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        cw.visit(Opcodes.V1_4, Opcodes.ACC_PUBLIC, "sun/reflect/GroovyMagic", null, "sun/reflect/MagicAccessorImpl", null);
-        MethodVisitor mv = cw.visitMethod(Opcodes.ACC_PUBLIC, "<init>", "()V", null, null);
+        cw.visit(V1_4, ACC_PUBLIC, "sun/reflect/GroovyMagic", null, "sun/reflect/MagicAccessorImpl", null);
+        MethodVisitor mv = cw.visitMethod(ACC_PUBLIC, "<init>", "()V", null, null);
         mv.visitCode();
         mv.visitVarInsn(ALOAD, 0);
         mv.visitMethodInsn(INVOKESPECIAL, "sun/reflect/MagicAccessorImpl", "<init>", "()V", false);
         mv.visitInsn(RETURN);
-        mv.visitMaxs(0,0);
+        mv.visitMaxs(0, 0);
         mv.visitEnd();
         cw.visitEnd();
 
@@ -79,31 +83,31 @@ public class SunClassLoader extends ClassLoader implements Opcodes {
     }
 
     protected void loadFromRes(String name) throws IOException {
-        final InputStream asStream = SunClassLoader.class.getClassLoader().getResourceAsStream(resName(name));
-        ClassReader reader = new ClassReader(asStream);
-        final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
-        reader.accept(cw, ClassWriter.COMPUTE_MAXS);
-        asStream.close();
-        define(cw.toByteArray(), name);
+        try (final InputStream asStream = SunClassLoader.class.getClassLoader().getResourceAsStream(resName(name))) {
+            ClassReader reader = new ClassReader(asStream);
+            final ClassWriter cw = new ClassWriter(ClassWriter.COMPUTE_MAXS);
+            reader.accept(cw, ClassReader.SKIP_DEBUG);
+            define(cw.toByteArray(), name);
+        }
     }
 
     protected static String resName(String s) {
-        return s.replace('.','/') + ".class";
+        return s.replace('.', '/') + ".class";
     }
 
     protected void define(byte[] bytes, final String name) {
         knownClasses.put(name, defineClass(name, bytes, 0, bytes.length));
     }
 
+    @Override
     protected synchronized Class loadClass(String name, boolean resolve) throws ClassNotFoundException {
         final Class aClass = knownClasses.get(name);
         if (aClass != null)
-          return aClass;
+            return aClass;
         else {
             try {
                 return super.loadClass(name, resolve);
-            }
-            catch (ClassNotFoundException e) {
+            } catch (ClassNotFoundException e) {
                 return getClass().getClassLoader().loadClass(name);
             }
         }

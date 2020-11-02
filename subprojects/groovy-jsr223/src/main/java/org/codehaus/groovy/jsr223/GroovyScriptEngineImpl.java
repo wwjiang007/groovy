@@ -69,6 +69,7 @@ import javax.script.Compilable;
 import javax.script.CompiledScript;
 import javax.script.Invocable;
 import javax.script.ScriptContext;
+import javax.script.ScriptEngine;
 import javax.script.ScriptEngineFactory;
 import javax.script.ScriptException;
 import javax.script.SimpleBindings;
@@ -76,7 +77,6 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.Reader;
 import java.io.Writer;
-import java.lang.reflect.InvocationHandler;
 import java.lang.reflect.Method;
 import java.lang.reflect.Proxy;
 import java.security.AccessController;
@@ -92,10 +92,10 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
     private static boolean debug = false;
 
     // script-string-to-generated Class map
-    private final ManagedConcurrentValueMap<String, Class<?>> classMap = new ManagedConcurrentValueMap<String, Class<?>>(ReferenceBundle.getSoftBundle());
+    private final ManagedConcurrentValueMap<String, Class<?>> classMap = new ManagedConcurrentValueMap<>(ReferenceBundle.getSoftBundle());
     // global closures map - this is used to simulate a single
     // global functions namespace 
-    private final ManagedConcurrentValueMap<String, Closure<?>> globalClosures = new ManagedConcurrentValueMap<String, Closure<?>>(ReferenceBundle.getHardBundle());
+    private final ManagedConcurrentValueMap<String, Closure<?>> globalClosures = new ManagedConcurrentValueMap<>(ReferenceBundle.getHardBundle());
     // class loader for Groovy generated classes
     private GroovyClassLoader loader;
     // lazily initialized factory
@@ -127,11 +127,13 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
         this.factory = factory;
     }
 
+    @Override
     public Object eval(Reader reader, ScriptContext ctx)
             throws ScriptException {
         return eval(readFully(reader), ctx);
     }
 
+    @Override
     public Object eval(String script, ScriptContext ctx)
             throws ScriptException {
         try {
@@ -150,7 +152,7 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
         } catch (ClassCastException cce) { /*ignore.*/ }
 
         try {
-            Class<?> clazz = getScriptClass(script);
+            Class<?> clazz = getScriptClass(script, ctx);
             if (clazz == null) throw new ScriptException("Script class is null");
             return eval(clazz, ctx);
         } catch (Exception e) {
@@ -159,10 +161,12 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
         }
     }
 
+    @Override
     public Bindings createBindings() {
         return new SimpleBindings();
     }
 
+    @Override
     public ScriptEngineFactory getFactory() {
         if (factory == null) {
             synchronized (this) {
@@ -175,25 +179,29 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
     }
 
     // javax.script.Compilable methods 
+    @Override
     public CompiledScript compile(String scriptSource) throws ScriptException {
         try {
             return new GroovyCompiledScript(this,
-                    getScriptClass(scriptSource));
+                    getScriptClass(scriptSource, context));
         } catch (CompilationFailedException ee) {
             throw new ScriptException(ee);
         }
     }
 
+    @Override
     public CompiledScript compile(Reader reader) throws ScriptException {
         return compile(readFully(reader));
     }
 
     // javax.script.Invokable methods.
+    @Override
     public Object invokeFunction(String name, Object... args)
             throws ScriptException, NoSuchMethodException {
         return invokeImpl(null, name, args);
     }
 
+    @Override
     public Object invokeMethod(Object thiz, String name, Object... args)
             throws ScriptException, NoSuchMethodException {
         if (thiz == null) {
@@ -202,10 +210,12 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
         return invokeImpl(thiz, name, args);
     }
 
+    @Override
     public <T> T getInterface(Class<T> clazz) {
         return makeInterface(null, clazz);
     }
 
+    @Override
     public <T> T getInterface(Object thiz, Class<T> clazz) {
         if (thiz == null) {
             throw new IllegalArgumentException("script object is null");
@@ -323,12 +333,17 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
 
     Class<?> getScriptClass(String script)
             throws CompilationFailedException {
+        return getScriptClass(script, null);
+    }
+
+    Class<?> getScriptClass(String script, ScriptContext context)
+            throws CompilationFailedException {
         Class<?> clazz = classMap.get(script);
         if (clazz != null) {
             return clazz;
         }
 
-        clazz = loader.parseClass(script, generateScriptName());
+        clazz = loader.parseClass(script, generateScriptName(context));
         classMap.put(script, clazz);
         return clazz;
     }
@@ -400,7 +415,15 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
     }
 
     // generate a unique name for top-level Script classes
-    private static synchronized String generateScriptName() {
+    private static synchronized String generateScriptName(ScriptContext	context) {
+        // If context is available, and contains FILENAME,
+        // use it as script name
+        if (context != null) {
+            Object filename = context.getAttribute(ScriptEngine.FILENAME);
+            if (filename != null) {
+                return filename.toString();
+            }
+        }
         return "Script" + (++counter) + ".groovy";
     }
 
@@ -413,12 +436,7 @@ public class GroovyScriptEngineImpl extends AbstractScriptEngine implements Comp
         return (T) Proxy.newProxyInstance(
                 clazz.getClassLoader(),
                 new Class<?>[]{clazz},
-                new InvocationHandler() {
-                    public Object invoke(Object proxy, Method m, Object[] args)
-                            throws Throwable {
-                        return invokeImplSafe(thiz, m.getName(), args);
-                    }
-                });
+                (proxy, m, args) -> invokeImplSafe(thiz, m.getName(), args));
     }
 
     // determine appropriate class loader to serve as parent loader

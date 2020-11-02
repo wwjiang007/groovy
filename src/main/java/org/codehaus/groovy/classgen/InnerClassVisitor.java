@@ -41,14 +41,18 @@ import org.codehaus.groovy.ast.stmt.ExpressionStatement;
 import org.codehaus.groovy.control.CompilationUnit;
 import org.codehaus.groovy.control.SourceUnit;
 import org.codehaus.groovy.transform.trait.Traits;
-import org.objectweb.asm.Opcodes;
 
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 
-public class InnerClassVisitor extends InnerClassVisitorHelper implements Opcodes {
+import static org.objectweb.asm.Opcodes.ACC_FINAL;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
+
+public class InnerClassVisitor extends InnerClassVisitorHelper {
 
     private ClassNode classNode;
     private FieldNode currentField;
@@ -170,7 +174,7 @@ public class InnerClassVisitor extends InnerClassVisitorHelper implements Opcode
             // add one parameter for each expression in the constructor call
             Parameter param = new Parameter(ClassHelper.OBJECT_TYPE, "p" + additionalParamCount + i);
             parameters.add(param);
-            // add the corresponsing argument to the super constructor call
+            // add the corresponding argument to the super constructor call
             superCallArguments.add(new VariableExpression(param));
         }
 
@@ -185,9 +189,8 @@ public class InnerClassVisitor extends InnerClassVisitorHelper implements Opcode
         int pCount = 0;
         if (!isStatic) {
             // need to pass "this" to access unknown methods/properties
-            expressions.add(pCount, VariableExpression.THIS_EXPRESSION);
-
             ClassNode enclosingType = (inClosure ? ClassHelper.CLOSURE_TYPE : outerClass).getPlainNodeReference();
+            expressions.add(pCount, new VariableExpression("this", enclosingType));
             Parameter thisParameter = new Parameter(enclosingType, "p" + pCount);
             parameters.add(pCount++, thisParameter);
 

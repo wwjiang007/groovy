@@ -101,11 +101,7 @@ public class MarkupTemplateEngine extends TemplateEngine {
                     }
             );
         }
-        groovyClassLoader = AccessController.doPrivileged(new PrivilegedAction<TemplateGroovyClassLoader>() {
-            public TemplateGroovyClassLoader run() {
-                return new TemplateGroovyClassLoader(parentLoader, compilerConfiguration);
-            }
-        });
+        groovyClassLoader = AccessController.doPrivileged((PrivilegedAction<TemplateGroovyClassLoader>) () -> new TemplateGroovyClassLoader(parentLoader, compilerConfiguration));
         if (DEBUG_BYTECODE) {
             compilerConfiguration.setBytecodePostprocessor(BytecodeDumper.STANDARD_ERR);
         }
@@ -139,6 +135,7 @@ public class MarkupTemplateEngine extends TemplateEngine {
         }
     }
 
+    @Override
     public Template createTemplate(final Reader reader) throws CompilationFailedException, ClassNotFoundException, IOException {
         return new MarkupTemplateMaker(reader, null, null);
     }
@@ -232,10 +229,12 @@ public class MarkupTemplateEngine extends TemplateEngine {
             this.modeltypes = modelTypes;
         }
 
+        @Override
         public Writable make() {
             return make(Collections.emptyMap());
         }
 
+        @Override
         public Writable make(final Map binding) {
             return DefaultGroovyMethods.newInstance(templateClass, new Object[]{MarkupTemplateEngine.this, binding, modeltypes, templateConfiguration});
         }
@@ -285,12 +284,13 @@ public class MarkupTemplateEngine extends TemplateEngine {
             return new TemplateResource(baseName, locale, extension);
         }
 
+        @Override
         public String toString() {
             return baseName + (locale != null ? "_" + locale : "") + "." + extension;
         }
 
         public boolean hasLocale() {
-            return locale != null && !"".equals(locale);
+            return locale != null && !locale.isEmpty();
         }
     }
 
@@ -301,11 +301,13 @@ public class MarkupTemplateEngine extends TemplateEngine {
         public DefaultTemplateResolver() {
         }
 
+        @Override
         public void configure(final ClassLoader templateClassLoader, final TemplateConfiguration configuration) {
             this.templateClassLoader = templateClassLoader;
             this.templateConfiguration = configuration;
         }
 
+        @Override
         public URL resolveTemplate(final String templatePath) throws IOException {
             MarkupTemplateEngine.TemplateResource templateResource = MarkupTemplateEngine.TemplateResource.parse(templatePath);
             String configurationLocale = templateConfiguration.getLocale().toString().replace("-", "_");

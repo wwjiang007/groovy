@@ -33,7 +33,7 @@ import org.codehaus.groovy.runtime.typehandling.NumberMath;
 
 import java.lang.reflect.Field;
 import java.lang.reflect.Modifier;
-import java.util.ArrayList;
+import java.util.Arrays;
 
 import static org.codehaus.groovy.syntax.Types.BITWISE_AND;
 import static org.codehaus.groovy.syntax.Types.BITWISE_OR;
@@ -47,24 +47,19 @@ import static org.codehaus.groovy.syntax.Types.POWER;
 import static org.codehaus.groovy.syntax.Types.RIGHT_SHIFT;
 import static org.codehaus.groovy.syntax.Types.RIGHT_SHIFT_UNSIGNED;
 
-public class ExpressionUtils {
-    private static ArrayList<Integer> handledTypes = new ArrayList<Integer>();
+public final class ExpressionUtils {
+
+    // NOTE: values are sorted in ascending order
+    private static final int[] HANDLED_TYPES = {
+            PLUS, MINUS, MULTIPLY, DIVIDE, POWER,
+            LEFT_SHIFT, RIGHT_SHIFT, RIGHT_SHIFT_UNSIGNED,
+            BITWISE_OR, BITWISE_AND, BITWISE_XOR
+    };
     static {
-        handledTypes.add(PLUS);
-        handledTypes.add(MINUS);
-        handledTypes.add(MULTIPLY);
-        handledTypes.add(DIVIDE);
-        handledTypes.add(LEFT_SHIFT);
-        handledTypes.add(RIGHT_SHIFT);
-        handledTypes.add(RIGHT_SHIFT_UNSIGNED);
-        handledTypes.add(BITWISE_OR);
-        handledTypes.add(BITWISE_AND);
-        handledTypes.add(BITWISE_XOR);
-        handledTypes.add(POWER);
+        Arrays.sort(HANDLED_TYPES);
     }
 
-    private ExpressionUtils() {
-    }
+    private ExpressionUtils() { }
 
     /**
      * Turns expressions of the form ConstantExpression(40) + ConstantExpression(2)
@@ -74,22 +69,22 @@ public class ExpressionUtils {
      * @param targetType the type of the result
      * @return the transformed expression or the original if no transformation was performed
      */
-    public static ConstantExpression transformBinaryConstantExpression(BinaryExpression be, ClassNode targetType) {
+    public static ConstantExpression transformBinaryConstantExpression(final BinaryExpression be, final ClassNode targetType) {
         ClassNode wrapperType = ClassHelper.getWrapper(targetType);
         if (isTypeOrArrayOfType(targetType, ClassHelper.STRING_TYPE, false)) {
             if (be.getOperation().getType() == PLUS) {
                 Expression left = transformInlineConstants(be.getLeftExpression(), targetType);
                 Expression right = transformInlineConstants(be.getRightExpression(), targetType);
                 if (left instanceof ConstantExpression && right instanceof ConstantExpression) {
-                    return configure(be, new ConstantExpression((String) ((ConstantExpression) left).getValue() +
-                            ((ConstantExpression) right).getValue()));
+                    return configure(be, new ConstantExpression((String) ((ConstantExpression) left).getValue() + ((ConstantExpression) right).getValue()));
                 }
             }
         } else if (isNumberOrArrayOfNumber(wrapperType, false)) {
             int type = be.getOperation().getType();
-            if (handledTypes.contains(type)) {
+            if (Arrays.binarySearch(HANDLED_TYPES, type) >= 0) {
+                boolean isShift = (type >= LEFT_SHIFT && type <= RIGHT_SHIFT_UNSIGNED);
                 Expression leftX = transformInlineConstants(be.getLeftExpression(), targetType);
-                Expression rightX = transformInlineConstants(be.getRightExpression(), targetType);
+                Expression rightX = transformInlineConstants(be.getRightExpression(), isShift ? ClassHelper.int_TYPE : targetType);
                 if (leftX instanceof ConstantExpression && rightX instanceof ConstantExpression) {
                     Number left = safeNumber((ConstantExpression) leftX);
                     Number right = safeNumber((ConstantExpression) rightX);
@@ -157,13 +152,13 @@ public class ExpressionUtils {
         return null;
     }
 
-    private static Number safeNumber(ConstantExpression constX) {
+    private static Number safeNumber(final ConstantExpression constX) {
         Object value = constX.getValue();
         if (value instanceof Number) return (Number) value;
         return null;
     }
 
-    private static ConstantExpression configure(Expression origX, ConstantExpression newX) {
+    private static ConstantExpression configure(final Expression origX, final ConstantExpression newX) {
         newX.setSourcePosition(origX);
         return newX;
     }
@@ -176,7 +171,7 @@ public class ExpressionUtils {
      * @param recurse true if we can have multi-dimension arrays; should be false for annotation member types
      * @return true if the type equals the targetType or array thereof
      */
-    public static boolean isTypeOrArrayOfType(ClassNode targetType, ClassNode type, boolean recurse) {
+    public static boolean isTypeOrArrayOfType(final ClassNode targetType, final ClassNode type, final boolean recurse) {
         if (targetType == null) return false;
         return type.equals(targetType) ||
                 (targetType.isArray() && recurse
@@ -191,7 +186,7 @@ public class ExpressionUtils {
      * @param recurse true if we can have multi-dimension arrays; should be false for annotation member types
      * @return true if the type equals the targetType or array thereof
      */
-    public static boolean isNumberOrArrayOfNumber(ClassNode targetType, boolean recurse) {
+    public static boolean isNumberOrArrayOfNumber(final ClassNode targetType, final boolean recurse) {
         if (targetType == null) return false;
         return targetType.isDerivedFrom(ClassHelper.Number_TYPE) ||
                 (targetType.isArray() && recurse
@@ -271,7 +266,7 @@ public class ExpressionUtils {
      * @param attrType the target type
      * @return the transformed list or the original if nothing was changed
      */
-    public static Expression transformListOfConstants(ListExpression origList, ClassNode attrType) {
+    public static Expression transformListOfConstants(final ListExpression origList, final ClassNode attrType) {
         ListExpression newList = new ListExpression();
         boolean changed = false;
         for (Expression e : origList.getExpressions()) {
@@ -336,12 +331,27 @@ public class ExpressionUtils {
         return exp;
     }
 
-    private static Expression findConstant(FieldNode fn) {
-        if (fn != null && !fn.isEnum() && fn.isStatic() && fn.isFinal()) {
-            if (fn.getInitialValueExpression() instanceof ConstantExpression) {
-                return fn.getInitialValueExpression();
-            }
+    private static Expression findConstant(final FieldNode fn) {
+        if (fn != null && !fn.isEnum() && fn.isStatic() && fn.isFinal()
+                && fn.getInitialValueExpression() instanceof ConstantExpression) {
+            return fn.getInitialValueExpression();
         }
         return null;
+    }
+
+    public static boolean isNullConstant(final Expression expression) {
+        return expression instanceof ConstantExpression && ((ConstantExpression) expression).isNullExpression();
+    }
+
+    public static boolean isThisExpression(final Expression expression) {
+        return expression instanceof VariableExpression && ((VariableExpression) expression).isThisExpression();
+    }
+
+    public static boolean isSuperExpression(final Expression expression) {
+        return expression instanceof VariableExpression && ((VariableExpression) expression).isSuperExpression();
+    }
+
+    public static boolean isThisOrSuper(final Expression expression) {
+        return isThisExpression(expression) || isSuperExpression(expression);
     }
 }

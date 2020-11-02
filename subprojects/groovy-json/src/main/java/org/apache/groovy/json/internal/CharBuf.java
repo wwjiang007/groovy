@@ -21,10 +21,10 @@ package org.apache.groovy.json.internal;
 import groovy.json.JsonException;
 
 import java.io.IOException;
-import java.io.UnsupportedEncodingException;
 import java.io.Writer;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.nio.charset.StandardCharsets;
 
 public class CharBuf extends Writer implements CharSequence {
 
@@ -44,16 +44,13 @@ public class CharBuf extends Writer implements CharSequence {
 
     public CharBuf(byte[] bytes) {
         this.buffer = null;
-        try {
-            String str = new String(bytes, "UTF-8");
-            __init__(FastStringUtils.toCharArray(str));
-        } catch (UnsupportedEncodingException e) {
-            Exceptions.handle(e);
-        }
+        String str = new String(bytes, StandardCharsets.UTF_8);
+        __init__(FastStringUtils.toCharArray(str));
     }
 
     public static CharBuf createExact(final int capacity) {
         return new CharBuf(capacity) {
+            @Override
             public CharBuf add(char[] chars) {
                 Chr._idx(buffer, location, chars);
                 location += chars.length;
@@ -79,6 +76,7 @@ public class CharBuf extends Writer implements CharSequence {
         init();
     }
 
+    @Override
     public void write(char[] cbuf, int off, int len) {
         if (off == 0 && cbuf.length == len) {
             this.add(cbuf);
@@ -88,9 +86,11 @@ public class CharBuf extends Writer implements CharSequence {
         }
     }
 
+    @Override
     public void flush() throws IOException {
     }
 
+    @Override
     public void close() throws IOException {
     }
 
@@ -401,7 +401,7 @@ public class CharBuf extends Writer implements CharSequence {
 
         int sizeNeeded = (ensureThisMuch) + _location;
         if (sizeNeeded > capacity) {
-            int growBy = (_buffer.length * 2) < sizeNeeded ? sizeNeeded : (_buffer.length * 2);
+            int growBy = Math.max((_buffer.length * 2), sizeNeeded);
             _buffer = Chr.grow(buffer, growBy);
             capacity = _buffer.length;
         }
@@ -593,18 +593,22 @@ public class CharBuf extends Writer implements CharSequence {
         return this;
     }
 
+    @Override
     public int length() {
         return len();
     }
 
+    @Override
     public char charAt(int index) {
         return buffer[index];
     }
 
+    @Override
     public CharSequence subSequence(int start, int end) {
         return new String(buffer, start, end - start);
     }
 
+    @Override
     public String toString() {
         return new String(buffer, 0, location);
     }

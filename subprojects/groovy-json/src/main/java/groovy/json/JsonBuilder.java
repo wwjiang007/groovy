@@ -302,6 +302,7 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
      * @param args the value associated with the key
      * @return a map with a single key
      */
+    @Override
     public Object invokeMethod(String name, Object args) {
         if (args != null && Object[].class.isAssignableFrom(args.getClass())) {
             Object[] arr = (Object[]) args;
@@ -319,8 +320,8 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
                 if (second instanceof Closure) {
                     final Closure closure = (Closure)second;
                     if (first instanceof Map) {
-                        Map subMap = new LinkedHashMap();
-                        subMap.putAll((Map) first);
+                        Map<String, Object> subMap = new LinkedHashMap<>();
+                        subMap.putAll(asMap(first));
                         subMap.putAll(JsonDelegate.cloneDelegateAndGetContent(closure));
 
                         return setAndGetContent(name, subMap);
@@ -341,6 +342,11 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
         } else {
             return setAndGetContent(name, new HashMap<String, Object>());
         }
+    }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> asMap(Object first) {
+        return (Map<String, Object>) first;
     }
 
     private static List<Map<String, Object>> collectContentForEachEntry(Iterable coll, Closure closure) {
@@ -372,6 +378,7 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
      *
      * @return a JSON output
      */
+    @Override
     public String toString() {
         return generator.toJson(content);
     }
@@ -408,6 +415,7 @@ public class JsonBuilder extends GroovyObjectSupport implements Writable {
      * @param out a writer on which to serialize the JSON payload
      * @return the writer
      */
+    @Override
     public Writer writeTo(Writer out) throws IOException {
         return out.append(toString());
     }

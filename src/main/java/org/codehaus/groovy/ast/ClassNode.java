@@ -32,7 +32,6 @@ import org.codehaus.groovy.control.CompilePhase;
 import org.codehaus.groovy.transform.ASTTransformation;
 import org.codehaus.groovy.transform.GroovyASTTransformation;
 import org.codehaus.groovy.vmplugin.VMPluginFactory;
-import org.objectweb.asm.Opcodes;
 
 import java.lang.reflect.Array;
 import java.util.ArrayList;
@@ -51,6 +50,14 @@ import java.util.stream.Collectors;
 
 import static java.util.Arrays.stream;
 import static java.util.stream.Collectors.joining;
+import static org.apache.groovy.ast.tools.MethodNodeUtils.getCodeAsBlock;
+import static org.objectweb.asm.Opcodes.ACC_ABSTRACT;
+import static org.objectweb.asm.Opcodes.ACC_ANNOTATION;
+import static org.objectweb.asm.Opcodes.ACC_ENUM;
+import static org.objectweb.asm.Opcodes.ACC_INTERFACE;
+import static org.objectweb.asm.Opcodes.ACC_PUBLIC;
+import static org.objectweb.asm.Opcodes.ACC_STATIC;
+import static org.objectweb.asm.Opcodes.ACC_SYNTHETIC;
 
 /**
  * Represents a class in the AST.
@@ -108,7 +115,7 @@ import static java.util.stream.Collectors.joining;
  *
  * @see org.codehaus.groovy.ast.ClassHelper
  */
-public class ClassNode extends AnnotatedNode implements Opcodes {
+public class ClassNode extends AnnotatedNode {
 
     private static class MapOfLists {
         Map<Object, List<MethodNode>> map;
@@ -141,7 +148,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
     private List<ConstructorNode> constructors;
     private MapOfLists methods;
     private List<MethodNode> methodsList;
-    private LinkedList<FieldNode> fields;
+    private List<FieldNode> fields;
     private List<PropertyNode> properties;
     private Map<String, FieldNode> fieldIndex;
     private ModuleNode module;
@@ -255,7 +262,6 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
         clazz = c;
         lazyInitDone = false;
         isPrimaryNode = false;
-        Optional.ofNullable(getCompileUnit()).ifPresent(cu -> cu.addClass(this));
     }
 
     /**
@@ -353,7 +359,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
             return redirect.getFields();
         lazyClassInit();
         if (fields == null)
-            fields = new LinkedList<>();
+            fields = new ArrayList<>();
         return fields;
     }
 
@@ -515,12 +521,12 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
         node.setDeclaringClass(r);
         node.setOwner(r);
         if (r.fields == null)
-            r.fields = new LinkedList<>();
+            r.fields = new ArrayList<>();
         if (r.fieldIndex == null)
             r.fieldIndex = new LinkedHashMap<>();
 
         if (isFirst) {
-            r.fields.addFirst(node);
+            r.fields.add(0, node);
         } else {
             r.fields.add(node);
         }
@@ -679,6 +685,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
         }
     }
 
+    @Override
     public boolean equals(Object that) {
         if (that == this) return true;
         if (!(that instanceof ClassNode)) return false;
@@ -686,6 +693,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
         return (((ClassNode) that).getText().equals(getText()));
     }
 
+    @Override
     public int hashCode() {
         return (redirect != null ? redirect.hashCode() : getText().hashCode());
     }
@@ -796,16 +804,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
 
     public void addStaticInitializerStatements(List<Statement> staticStatements, boolean fieldInit) {
         MethodNode method = getOrAddStaticConstructorNode();
-        BlockStatement block = null;
-        Statement statement = method.getCode();
-        if (statement == null) {
-            block = new BlockStatement();
-        } else if (statement instanceof BlockStatement) {
-            block = (BlockStatement) statement;
-        } else {
-            block = new BlockStatement();
-            block.addStatement(statement);
-        }
+        BlockStatement block = getCodeAsBlock(method);
 
         // while anything inside a static initializer block is appended
         // we don't want to append in the case we have a initialization
@@ -1110,11 +1109,14 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
 
         // visit the method nodes added while iterating,
         // e.g. synthetic method for constructor reference
-        List<MethodNode> changedMethodList = new ArrayList<>(getMethods());
-        boolean changed = changedMethodList.removeAll(methodList);
-        if (changed) {
-            for (MethodNode mn : changedMethodList) {
-                visitor.visitMethod(mn);
+        final List<MethodNode> newMethodList = getMethods();
+        if (newMethodList.size() > methodList.size()) { // if the newly added method nodes found, visit them
+            List<MethodNode> changedMethodList = new ArrayList<>(newMethodList);
+            boolean changed = changedMethodList.removeAll(methodList);
+            if (changed) {
+                for (MethodNode mn : changedMethodList) {
+                    visitor.visitMethod(mn);
+                }
             }
         }
     }
@@ -1201,6 +1203,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
         redirect().script = script;
     }
 
+    @Override
     public String toString() {
         return toString(true);
     }
@@ -1249,71 +1252,65 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
     }
 
     /**
-     * Returns true if the given method has a possibly matching instance method with the given name and arguments.
+     * Determines if the type has a possibly-matching instance method with the given name and arguments.
      *
      * @param name      the name of the method of interest
      * @param arguments the arguments to match against
      * @return true if a matching method was found
      */
-    public boolean hasPossibleMethod(String name, Expression arguments) {
-        int count = 0;
-
+    public boolean hasPossibleMethod(final String name, final Expression arguments) {
+        int count;
         if (arguments instanceof TupleExpression) {
-            TupleExpression tuple = (TupleExpression) arguments;
-            // TODO this won't strictly be true when using list expansion in argument calls
-            count = tuple.getExpressions().size();
+            // TODO: this won't strictly be true when using list expansion in argument calls
+            count = ((TupleExpression) arguments).getExpressions().size();
+        } else {
+            count = 0;
         }
-        ClassNode node = this;
-        do {
-            for (MethodNode method : getMethods(name)) {
-                if (hasCompatibleNumberOfArgs(method, count) && !method.isStatic()) {
+
+        for (ClassNode cn = this; cn != null; cn = cn.getSuperClass()) {
+            for (MethodNode mn : getDeclaredMethods(name)) {
+                if (!mn.isStatic() && hasCompatibleNumberOfArgs(mn, count)) {
                     return true;
                 }
             }
-            node = node.getSuperClass();
         }
-        while (node != null);
 
         return false;
     }
 
-    public MethodNode tryFindPossibleMethod(String name, Expression arguments) {
-        int count = 0;
-
-        if (arguments instanceof TupleExpression) {
-            TupleExpression tuple = (TupleExpression) arguments;
-            // TODO this won't strictly be true when using list expansion in argument calls
-            count = tuple.getExpressions().size();
-        } else {
+    public MethodNode tryFindPossibleMethod(final String name, final Expression arguments) {
+        if (!(arguments instanceof TupleExpression)) {
             return null;
         }
 
-        MethodNode res = null;
-        ClassNode node = this;
+        // TODO: this won't strictly be true when using list expansion in argument calls
         TupleExpression args = (TupleExpression) arguments;
-        do {
-            for (MethodNode method : node.getMethods(name)) {
-                if (hasCompatibleNumberOfArgs(method, count)) {
+        int count = args.getExpressions().size();
+        MethodNode res = null;
+
+        for (ClassNode cn = this; cn != null; cn = cn.getSuperClass()) {
+            for (MethodNode mn : cn.getDeclaredMethods(name)) {
+                if (hasCompatibleNumberOfArgs(mn, count)) {
                     boolean match = true;
                     for (int i = 0; i < count; i += 1) {
-                        if (!hasCompatibleType(args, method, i)) {
+                        if (!hasCompatibleType(args, mn, i)) {
                             match = false;
                             break;
                         }
                     }
                     if (match) {
                         if (res == null) {
-                            res = method;
+                            res = mn;
                         } else {
                             if (res.getParameters().length != count)
                                 return null;
-                            if (node.equals(this))
+                            if (cn.equals(this))
                                 return null;
 
                             match = true;
                             for (int i = 0; i < count; i += 1) {
                                 // prefer super method if it matches better
-                                if (!hasExactMatchingCompatibleType(res, method, i)) {
+                                if (!hasExactMatchingCompatibleType(res, mn, i)) {
                                     match = false;
                                     break;
                                 }
@@ -1325,9 +1322,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
                     }
                 }
             }
-            node = node.getSuperClass();
         }
-        while (node != null);
 
         return res;
     }
@@ -1470,6 +1465,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
         return isInterface() && (getModifiers() & ACC_ANNOTATION) != 0;
     }
 
+    @Override
     public List<AnnotationNode> getAnnotations() {
         if (redirect != null)
             return redirect.getAnnotations();
@@ -1477,6 +1473,7 @@ public class ClassNode extends AnnotatedNode implements Opcodes {
         return super.getAnnotations();
     }
 
+    @Override
     public List<AnnotationNode> getAnnotations(ClassNode type) {
         if (redirect != null)
             return redirect.getAnnotations(type);

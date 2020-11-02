@@ -102,37 +102,18 @@ class CustomizersTest extends GroovyTestCase {
         '''
     }
 
-    void testAstTransformationCustomizerWithClosureExpression() {
-        // tag::ast_cz_closure[]
-        def configuration = new CompilerConfiguration()
-        def expression = new AstBuilder().buildFromCode(CompilePhase.CONVERSION) { -> true }.expression[0]
-        def customizer = new ASTTransformationCustomizer(ConditionalInterrupt, value: expression, thrown: SecurityException)
-        configuration.addCompilationCustomizers(customizer)
-        def shell = new GroovyShell(configuration)
-        shouldFail(SecurityException) {
-            shell.evaluate("""
-                // equivalent to adding @ConditionalInterrupt(value={true}, thrown: SecurityException)
-                class MyClass {
-                    void doIt() { }
-                }
-                new MyClass().doIt()
-            """)
-        }
-        // end::ast_cz_closure[]
-    }
-
     void testSecureASTCustomizer() {
         // tag::secure_cz[]
         def scz = new SecureASTCustomizer()
         scz.with {
             closuresAllowed = false // user will not be able to write closures
             methodDefinitionAllowed = false // user will not be able to define methods
-            importsWhitelist = [] // empty whitelist means imports are disallowed
-            staticImportsWhitelist = [] // same for static imports
-            staticStarImportsWhitelist = ['java.lang.Math'] // only java.lang.Math is allowed
+            allowedImports = [] // empty allowed list means imports are disallowed
+            allowedStaticImports = [] // same for static imports
+            allowedStaticStarImports = ['java.lang.Math'] // only java.lang.Math is allowed
             // the list of tokens the user can find
             // constants are defined in org.codehaus.groovy.syntax.Types
-            tokensWhitelist = [ // <1>
+            allowedTokens = [ // <1>
                     PLUS,
                     MINUS,
                     MULTIPLY,
@@ -149,7 +130,7 @@ class CustomizersTest extends GroovyTestCase {
                     COMPARE_GREATER_THAN_EQUAL,
             ].asImmutable()
             // limit the types of constants that a user can define to number types only
-            constantTypesClassesWhiteList = [ // <2>
+            allowedConstantTypesClasses = [ // <2>
                     Integer,
                     Float,
                     Long,
@@ -162,7 +143,7 @@ class CustomizersTest extends GroovyTestCase {
             ].asImmutable()
             // method calls are only allowed if the receiver is of one of those types
             // be careful, it's not a runtime type!
-            receiversClassesWhiteList = [ // <2>
+            allowedReceiversClasses = [ // <2>
                     Math,
                     Integer,
                     Float,

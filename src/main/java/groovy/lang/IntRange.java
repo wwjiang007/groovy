@@ -223,6 +223,10 @@ public class IntRange extends AbstractList<Integer> implements Range<Integer>, S
         if (inclusive == null) {
             throw new IllegalStateException("Should not call subListBorders on a non-inclusive aware IntRange");
         }
+        return subListBorders(from, to, inclusive, size);
+    }
+
+    static RangeInfo subListBorders(int from, int to, boolean inclusive, int size) {
         int tempFrom = from;
         if (tempFrom < 0) {
             tempFrom += size;
@@ -251,6 +255,7 @@ public class IntRange extends AbstractList<Integer> implements Range<Integer>, S
      * @param that the object to compare
      * @return <code>true</code> if the objects are equal
      */
+    @Override
     public boolean equals(Object that) {
         return that instanceof IntRange ? equals((IntRange) that) : super.equals(that);
     }
@@ -360,6 +365,7 @@ public class IntRange extends AbstractList<Integer> implements Range<Integer>, S
         return new IntRange(fromIndex + getFrom(), toIndex + getFrom() - 1, isReverse());
     }
 
+    @Override
     public String toString() {
         return inclusive != null ? ("" + from + ".." + (inclusive ? "" : "<") + to)
                 : (reverse ? "" + to + ".." + from : "" + from + ".." + to);

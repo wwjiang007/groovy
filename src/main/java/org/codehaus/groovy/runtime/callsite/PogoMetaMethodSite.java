@@ -55,6 +55,7 @@ public class PogoMetaMethodSite extends PlainObjectMetaMethodSite {
         }
     }
 
+    @Override
     public Object callCurrent(GroovyObject receiver, Object[] args) throws Throwable {
         if(checkCall(receiver, args)) {
             try {
@@ -67,6 +68,7 @@ public class PogoMetaMethodSite extends PlainObjectMetaMethodSite {
         }
     }
 
+    @Override
     public Object call(Object receiver, Object[] args) throws Throwable {
         if(checkCall(receiver, args)) {
             try {
@@ -160,10 +162,11 @@ public class PogoMetaMethodSite extends PlainObjectMetaMethodSite {
         final Method reflect;
 
         public PogoCachedMethodSite(CallSite site, MetaClassImpl metaClass, CachedMethod metaMethod, Class[] params) {
-            super(site, metaClass, VM_PLUGIN.transformMetaMethod(metaClass, metaMethod, params), params);
+            super(site, metaClass, VM_PLUGIN.transformMetaMethod(metaClass, metaMethod), params);
             reflect = ((CachedMethod) super.metaMethod).setAccessible();
         }
 
+        @Override
         public Object invoke(Object receiver, Object[] args) throws Throwable {
             MetaClassHelper.unwrap(args);
             args = metaMethod.coerceArgumentsToClasses(args);
@@ -177,6 +180,7 @@ public class PogoMetaMethodSite extends PlainObjectMetaMethodSite {
             super(site, metaClass, metaMethod, params);
         }
 
+        @Override
         public final Object invoke(Object receiver, Object[] args) throws Throwable {
             args = metaMethod.coerceArgumentsToClasses(args);
             return doInvoke(receiver, args, reflect);
@@ -189,6 +193,7 @@ public class PogoMetaMethodSite extends PlainObjectMetaMethodSite {
             super(site, metaClass, metaMethod, params);
         }
 
+        @Override
         public final Object invoke(Object receiver, Object[] args) throws Throwable {
             return doInvoke(receiver, args, reflect);
         }
@@ -203,6 +208,7 @@ public class PogoMetaMethodSite extends PlainObjectMetaMethodSite {
             super(site, metaClass, metaMethod, params);
         }
 
+        @Override
         public final Object invoke(Object receiver, Object[] args) throws Throwable {
             try {
                 return metaMethod.doMethodInvoke(receiver,  args);
@@ -221,6 +227,7 @@ public class PogoMetaMethodSite extends PlainObjectMetaMethodSite {
             super(site, metaClass, metaMethod, params);
         }
 
+        @Override
         public final Object invoke(Object receiver, Object[] args) throws Throwable {
             try {
                 return metaMethod.invoke(receiver,  args);

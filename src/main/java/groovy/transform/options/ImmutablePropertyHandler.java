@@ -19,6 +19,7 @@
 package groovy.transform.options;
 
 import groovy.lang.ReadOnlyPropertyException;
+import groovy.transform.stc.POJO;
 import org.apache.groovy.ast.tools.ImmutablePropertyUtils;
 import org.codehaus.groovy.ast.AnnotationNode;
 import org.codehaus.groovy.ast.ClassHelper;
@@ -31,6 +32,7 @@ import org.codehaus.groovy.ast.expr.ConstantExpression;
 import org.codehaus.groovy.ast.expr.Expression;
 import org.codehaus.groovy.ast.expr.MapExpression;
 import org.codehaus.groovy.ast.expr.MethodCallExpression;
+import org.codehaus.groovy.ast.expr.VariableExpression;
 import org.codehaus.groovy.ast.stmt.BlockStatement;
 import org.codehaus.groovy.ast.stmt.EmptyStatement;
 import org.codehaus.groovy.ast.stmt.Statement;
@@ -38,6 +40,7 @@ import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.transform.AbstractASTTransformation;
 import org.codehaus.groovy.transform.ImmutableASTTransformation;
 import org.codehaus.groovy.transform.MapConstructorASTTransformation;
+import org.codehaus.groovy.transform.NullCheckASTTransformation;
 
 import java.util.Collection;
 import java.util.List;
@@ -46,6 +49,7 @@ import java.util.Set;
 import java.util.SortedMap;
 import java.util.SortedSet;
 
+import static org.apache.groovy.ast.tools.ConstructorNodeUtils.checkPropNamesS;
 import static org.apache.groovy.ast.tools.ImmutablePropertyUtils.cloneArrayOrCloneableExpr;
 import static org.apache.groovy.ast.tools.ImmutablePropertyUtils.cloneDateExpr;
 import static org.apache.groovy.ast.tools.ImmutablePropertyUtils.derivesFromDate;
@@ -53,6 +57,7 @@ import static org.apache.groovy.ast.tools.ImmutablePropertyUtils.implementsClone
 import static org.codehaus.groovy.ast.ClassHelper.make;
 import static org.codehaus.groovy.ast.ClassHelper.makeWithoutCaching;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.args;
+import static org.codehaus.groovy.ast.tools.GeneralUtils.assignNullS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.assignS;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.callThisX;
 import static org.codehaus.groovy.ast.tools.GeneralUtils.callX;
@@ -86,9 +91,10 @@ public class ImmutablePropertyHandler extends PropertyHandler {
     private static final ClassNode SET_CLASSNODE = make(Set.class);
     private static final ClassNode MAP_CLASSNODE = make(Map.class);
     private static final ClassNode READONLYEXCEPTION_TYPE = make(ReadOnlyPropertyException.class);
+    private static final ClassNode POJO_TYPE = make(POJO.class);
 
     @Override
-    public Statement createPropGetter(PropertyNode pNode) {
+    public Statement createPropGetter(final PropertyNode pNode) {
         FieldNode fNode = pNode.getField();
         BlockStatement body = new BlockStatement();
         final ClassNode fieldType = fNode.getType();
@@ -105,27 +111,28 @@ public class ImmutablePropertyHandler extends PropertyHandler {
     }
 
     @Override
-    public Statement createPropSetter(PropertyNode pNode) {
+    public Statement createPropSetter(final PropertyNode pNode) {
         return null;
     }
 
     @Override
-    public boolean validateAttributes(AbstractASTTransformation xform, AnnotationNode anno) {
-        boolean success = isValidAttribute(xform, anno, "useSuper");
-        return success;
+    public boolean validateAttributes(final AbstractASTTransformation xform, final AnnotationNode anno) {
+        return isValidAttribute(xform, anno, "useSuper");
     }
 
     @Override
-    public boolean validateProperties(AbstractASTTransformation xform, BlockStatement body, ClassNode cNode, List<PropertyNode> props) {
+    public boolean validateProperties(final AbstractASTTransformation xform, final BlockStatement body, final ClassNode cNode, final List<PropertyNode> props) {
         if (xform instanceof MapConstructorASTTransformation) {
-            body.addStatement(ifS(equalsNullX(varX("args")), assignS(varX("args"), new MapExpression())));
-            body.addStatement(stmt(callX(SELF_TYPE, "checkPropNames", args("this", "args"))));
+            VariableExpression namedArgs = varX("args");
+            body.addStatement(ifS(equalsNullX(namedArgs), assignS(namedArgs, new MapExpression())));
+            boolean pojo = !cNode.getAnnotations(POJO_TYPE).isEmpty();
+            body.addStatement(checkPropNamesS(namedArgs, pojo, props));
         }
         return super.validateProperties(xform, body, cNode, props);
     }
 
     @Override
-    public Statement createPropInit(AbstractASTTransformation xform, AnnotationNode anno, ClassNode cNode, PropertyNode pNode, Parameter namedArgsMap) {
+    public Statement createPropInit(final AbstractASTTransformation xform, final AnnotationNode anno, final ClassNode cNode, final PropertyNode pNode, final Parameter namedArgsMap) {
         FieldNode fNode = pNode.getField();
         if (fNode.isFinal() && fNode.isStatic()) return null;
         if (fNode.isFinal() && fNode.getInitialExpression() != null) {
@@ -134,24 +141,24 @@ public class ImmutablePropertyHandler extends PropertyHandler {
         return createConstructorStatement(xform, cNode, pNode, namedArgsMap);
     }
 
-    private static Statement createGetterBodyDefault(FieldNode fNode) {
+    private static Statement createGetterBodyDefault(final FieldNode fNode) {
         final Expression fieldExpr = varX(fNode);
         return stmt(fieldExpr);
     }
 
-    private Statement createGetterBodyArrayOrCloneable(FieldNode fNode) {
+    private Statement createGetterBodyArrayOrCloneable(final FieldNode fNode) {
         final Expression fieldExpr = varX(fNode);
         final Expression expression = cloneArrayOrCloneableExpr(fieldExpr, fNode.getType());
         return safeExpression(fieldExpr, expression);
     }
 
-    private Statement createGetterBodyDate(FieldNode fNode) {
+    private Statement createGetterBodyDate(final FieldNode fNode) {
         final Expression fieldExpr = varX(fNode);
         final Expression expression = cloneDateExpr(fieldExpr);
         return safeExpression(fieldExpr, expression);
     }
 
-    protected Expression cloneCollectionExpr(Expression fieldExpr, ClassNode type) {
+    protected Expression cloneCollectionExpr(final Expression fieldExpr, final ClassNode type) {
         return castX(type, createIfInstanceOfAsImmutableS(fieldExpr, SORTEDSET_CLASSNODE,
                 createIfInstanceOfAsImmutableS(fieldExpr, SORTEDMAP_CLASSNODE,
                         createIfInstanceOfAsImmutableS(fieldExpr, SET_CLASSNODE,
@@ -164,7 +171,7 @@ public class ImmutablePropertyHandler extends PropertyHandler {
         ));
     }
 
-    private Expression createIfInstanceOfAsImmutableS(Expression expr, ClassNode type, Expression elseStatement) {
+    private Expression createIfInstanceOfAsImmutableS(final Expression expr, final ClassNode type, final Expression elseStatement) {
         return ternaryX(isInstanceOfX(expr, type), createAsImmutableX(expr, type), elseStatement);
     }
 
@@ -172,85 +179,45 @@ public class ImmutablePropertyHandler extends PropertyHandler {
         return callX(DGM_TYPE, "asImmutable", castX(type, expr));
     }
 
-    @Deprecated
-    protected Statement createConstructorStatement(AbstractASTTransformation xform, ClassNode cNode, PropertyNode pNode, boolean namedArgs) {
+    protected Statement createConstructorStatement(final AbstractASTTransformation xform, final ClassNode cNode, final PropertyNode pNode, final Parameter namedArgsMap) {
         final List<String> knownImmutableClasses = ImmutablePropertyUtils.getKnownImmutableClasses(xform, cNode);
         final List<String> knownImmutables = ImmutablePropertyUtils.getKnownImmutables(xform, cNode);
         FieldNode fNode = pNode.getField();
         final ClassNode fType = fNode.getType();
         Statement statement;
+        boolean shouldNullCheck = NullCheckASTTransformation.hasIncludeGenerated(cNode);
         if (ImmutablePropertyUtils.isKnownImmutableType(fType, knownImmutableClasses) || isKnownImmutable(pNode.getName(), knownImmutables)) {
-            statement = createConstructorStatementDefault(fNode, namedArgs);
+            statement = createConstructorStatementDefault(fNode, namedArgsMap, shouldNullCheck);
         } else if (fType.isArray() || implementsCloneable(fType)) {
-            statement = createConstructorStatementArrayOrCloneable(fNode, namedArgs);
+            statement = createConstructorStatementArrayOrCloneable(fNode, namedArgsMap, shouldNullCheck);
         } else if (derivesFromDate(fType)) {
-            statement = createConstructorStatementDate(fNode, namedArgs);
+            statement = createConstructorStatementDate(fNode, namedArgsMap, shouldNullCheck);
         } else if (isOrImplements(fType, COLLECTION_TYPE) || fType.isDerivedFrom(COLLECTION_TYPE) || isOrImplements(fType, MAP_TYPE) || fType.isDerivedFrom(MAP_TYPE)) {
-            statement = createConstructorStatementCollection(fNode, namedArgs);
+            statement = createConstructorStatementCollection(fNode, namedArgsMap, shouldNullCheck);
         } else if (fType.isResolved()) {
             xform.addError(ImmutablePropertyUtils.createErrorMessage(cNode.getName(), fNode.getName(), fType.getName(), "compiling"), fNode);
             statement = EmptyStatement.INSTANCE;
         } else {
-            statement = createConstructorStatementGuarded(cNode, fNode, namedArgs, knownImmutables, knownImmutableClasses);
+            statement = createConstructorStatementGuarded(fNode, namedArgsMap, knownImmutables, knownImmutableClasses, shouldNullCheck);
         }
         return statement;
     }
 
-    protected Statement createConstructorStatement(AbstractASTTransformation xform, ClassNode cNode, PropertyNode pNode, Parameter namedArgsMap) {
-        final List<String> knownImmutableClasses = ImmutablePropertyUtils.getKnownImmutableClasses(xform, cNode);
-        final List<String> knownImmutables = ImmutablePropertyUtils.getKnownImmutables(xform, cNode);
-        FieldNode fNode = pNode.getField();
-        final ClassNode fType = fNode.getType();
-        Statement statement;
-        if (ImmutablePropertyUtils.isKnownImmutableType(fType, knownImmutableClasses) || isKnownImmutable(pNode.getName(), knownImmutables)) {
-            statement = createConstructorStatementDefault(fNode, namedArgsMap);
-        } else if (fType.isArray() || implementsCloneable(fType)) {
-            statement = createConstructorStatementArrayOrCloneable(fNode, namedArgsMap);
-        } else if (derivesFromDate(fType)) {
-            statement = createConstructorStatementDate(fNode, namedArgsMap);
-        } else if (isOrImplements(fType, COLLECTION_TYPE) || fType.isDerivedFrom(COLLECTION_TYPE) || isOrImplements(fType, MAP_TYPE) || fType.isDerivedFrom(MAP_TYPE)) {
-            statement = createConstructorStatementCollection(fNode, namedArgsMap);
-        } else if (fType.isResolved()) {
-            xform.addError(ImmutablePropertyUtils.createErrorMessage(cNode.getName(), fNode.getName(), fType.getName(), "compiling"), fNode);
-            statement = EmptyStatement.INSTANCE;
-        } else {
-            statement = createConstructorStatementGuarded(fNode, namedArgsMap, knownImmutables, knownImmutableClasses);
-        }
-        return statement;
-    }
-
-    private static Statement createConstructorStatementDefault(FieldNode fNode, boolean namedArgs) {
-        final ClassNode fType = fNode.getType();
-        final Expression fieldExpr = propX(varX("this"), fNode.getName());
-        Expression initExpr = fNode.getInitialValueExpression();
-        Statement assignInit;
-        if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression)initExpr).isNullExpression())) {
-            if (ClassHelper.isPrimitiveType(fType)) {
-                assignInit = EmptyStatement.INSTANCE;
-            } else {
-                assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
-            }
-        } else {
-            assignInit = assignS(fieldExpr, initExpr);
-        }
-        fNode.setInitialValueExpression(null);
-        Expression param = getParam(fNode, namedArgs);
-        Statement assignStmt = assignS(fieldExpr, castX(fType, param));
-        return assignWithDefault(namedArgs, assignInit, param, assignStmt);
-    }
-
-    private static Statement createConstructorStatementDefault(FieldNode fNode, Parameter namedArgsMap) {
+    private static Statement createConstructorStatementDefault(final FieldNode fNode, final Parameter namedArgsMap, final boolean shouldNullCheck) {
         final ClassNode fType = fNode.getType();
         final Expression fieldExpr = propX(varX("this"), fNode.getName());
         Expression param = getParam(fNode, namedArgsMap != null);
         Statement assignStmt = assignS(fieldExpr, castX(fType, param));
+        if (shouldNullCheck) {
+            assignStmt = ifElseS(equalsNullX(param), NullCheckASTTransformation.makeThrowStmt(fNode.getName()), assignStmt);
+        }
         Expression initExpr = fNode.getInitialValueExpression();
         Statement assignInit;
-        if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression)initExpr).isNullExpression())) {
+        if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
             if (ClassHelper.isPrimitiveType(fType)) {
                 assignInit = EmptyStatement.INSTANCE;
             } else {
-                assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
+                assignInit = shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr);
             }
         } else {
             assignInit = assignS(fieldExpr, initExpr);
@@ -258,7 +225,7 @@ public class ImmutablePropertyHandler extends PropertyHandler {
         return assignFieldWithDefault(namedArgsMap, fNode, assignStmt, assignInit);
     }
 
-    private static Statement assignFieldWithDefault(Parameter map, FieldNode fNode, Statement assignStmt, Statement assignInit) {
+    private static Statement assignFieldWithDefault(final Parameter map, final FieldNode fNode, final Statement assignStmt, final Statement assignInit) {
         if (map == null) {
             return assignStmt;
         }
@@ -271,66 +238,31 @@ public class ImmutablePropertyHandler extends PropertyHandler {
         return ifElseS(containsKey, assignStmt, assignInit);
     }
 
-    private static Statement assignWithDefault(boolean namedArgs, Statement assignInit, Expression param, Statement assignStmt) {
-        if (!namedArgs) {
-            return assignStmt;
-        }
-        return ifElseS(equalsNullX(param), assignInit, assignStmt);
-    }
-
-    private static Statement createConstructorStatementGuarded(ClassNode cNode, FieldNode fNode, boolean namedArgs, List<String> knownImmutables, List<String> knownImmutableClasses) {
-        final Expression fieldExpr = propX(varX("this"), fNode.getName());
-        Expression initExpr = fNode.getInitialValueExpression();
-        final Statement assignInit;
-        if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
-        } else {
-            assignInit = assignS(fieldExpr, checkUnresolved(fNode, initExpr, knownImmutables, knownImmutableClasses));
-        }
-        Expression param = getParam(fNode, namedArgs);
-        Statement assignStmt = assignS(fieldExpr, checkUnresolved(fNode, param, knownImmutables, knownImmutableClasses));
-        return assignWithDefault(namedArgs, assignInit, param, assignStmt);
-    }
-
-    private static Statement createConstructorStatementGuarded(FieldNode fNode, Parameter namedArgsMap, List<String> knownImmutables, List<String> knownImmutableClasses) {
+    private static Statement createConstructorStatementGuarded(final FieldNode fNode, final Parameter namedArgsMap, final List<String> knownImmutables, final List<String> knownImmutableClasses, final boolean shouldNullCheck) {
         final Expression fieldExpr = propX(varX("this"), fNode.getName());
         Expression param = getParam(fNode, namedArgsMap != null);
-        Statement assignStmt = assignS(fieldExpr, checkUnresolved(fNode, param, knownImmutables, knownImmutableClasses));
-        assignStmt = ifElseS(equalsNullX(param), assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION), assignStmt);
+        Statement assignStmt = assignS(fieldExpr, createCheckImmutable(fNode, param, knownImmutables, knownImmutableClasses));
+        assignStmt = ifElseS(
+                equalsNullX(param),
+                shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr),
+                assignStmt);
         Expression initExpr = fNode.getInitialValueExpression();
         final Statement assignInit;
         if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
+            assignInit = shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr);
         } else {
-            assignInit = assignS(fieldExpr, checkUnresolved(fNode, initExpr, knownImmutables, knownImmutableClasses));
+            assignInit = assignS(fieldExpr, createCheckImmutable(fNode, initExpr, knownImmutables, knownImmutableClasses));
         }
         return assignFieldWithDefault(namedArgsMap, fNode, assignStmt, assignInit);
     }
 
-    private static Expression checkUnresolved(FieldNode fNode, Expression value, List<String> knownImmutables, List<String> knownImmutableClasses) {
+    // check at runtime since classes might not be resolved
+    private static Expression createCheckImmutable(final FieldNode fNode, final Expression value, final List<String> knownImmutables, final List<String> knownImmutableClasses) {
         Expression args = args(callThisX("getClass"), constX(fNode.getName()), value, list2args(knownImmutables), classList2args(knownImmutableClasses));
         return callX(SELF_TYPE, "checkImmutable", args);
     }
 
-    private Statement createConstructorStatementCollection(FieldNode fNode, boolean namedArgs) {
-        final Expression fieldExpr = propX(varX("this"), fNode.getName());
-        ClassNode fieldType = fieldExpr.getType();
-        Expression initExpr = fNode.getInitialValueExpression();
-        final Statement assignInit;
-        if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
-        } else {
-            assignInit = assignS(fieldExpr, cloneCollectionExpr(initExpr, fieldType));
-        }
-        Expression param = getParam(fNode, namedArgs);
-        Statement assignStmt = ifElseS(
-                isInstanceOfX(param, CLONEABLE_TYPE),
-                assignS(fieldExpr, cloneCollectionExpr(cloneArrayOrCloneableExpr(param, fieldType), fieldType)),
-                assignS(fieldExpr, cloneCollectionExpr(param, fieldType)));
-        return assignWithDefault(namedArgs, assignInit, param, assignStmt);
-    }
-
-    private Statement createConstructorStatementCollection(FieldNode fNode, Parameter namedArgsMap) {
+    private Statement createConstructorStatementCollection(final FieldNode fNode, final Parameter namedArgsMap, final boolean shouldNullCheck) {
         final Expression fieldExpr = propX(varX("this"), fNode.getName());
         ClassNode fieldType = fieldExpr.getType();
         Expression param = getParam(fNode, namedArgsMap != null);
@@ -338,92 +270,73 @@ public class ImmutablePropertyHandler extends PropertyHandler {
                 isInstanceOfX(param, CLONEABLE_TYPE),
                 assignS(fieldExpr, cloneCollectionExpr(cloneArrayOrCloneableExpr(param, fieldType), fieldType)),
                 assignS(fieldExpr, cloneCollectionExpr(param, fieldType)));
-        assignStmt = ifElseS(equalsNullX(param), assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION), assignStmt);
+        assignStmt = ifElseS(
+                equalsNullX(param),
+                shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr),
+                assignStmt);
         Expression initExpr = fNode.getInitialValueExpression();
         final Statement assignInit;
         if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
+            assignInit = shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr);
         } else {
             assignInit = assignS(fieldExpr, cloneCollectionExpr(initExpr, fieldType));
         }
         return assignFieldWithDefault(namedArgsMap, fNode, assignStmt, assignInit);
     }
 
-    private static Statement createConstructorStatementArrayOrCloneable(FieldNode fNode, boolean namedArgs) {
-        final Expression fieldExpr = propX(varX("this"), fNode.getName());
-        final Expression initExpr = fNode.getInitialValueExpression();
-        final ClassNode fieldType = fNode.getType();
-        final Expression param = getParam(fNode, namedArgs);
-        final Statement assignInit;
-        if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
-        } else {
-            assignInit = assignS(fieldExpr, cloneArrayOrCloneableExpr(initExpr, fieldType));
-        }
-        Statement assignStmt = assignS(fieldExpr, cloneArrayOrCloneableExpr(param, fieldType));
-        return assignWithDefault(namedArgs, assignInit, param, assignStmt);
-    }
-
-    private static Statement createConstructorStatementArrayOrCloneable(FieldNode fNode, Parameter namedArgsMap) {
+    private static Statement createConstructorStatementArrayOrCloneable(final FieldNode fNode, final Parameter namedArgsMap, final boolean shouldNullCheck) {
         final Expression fieldExpr = propX(varX("this"), fNode.getName());
         final ClassNode fieldType = fNode.getType();
         final Expression param = getParam(fNode, namedArgsMap != null);
         Statement assignStmt = assignS(fieldExpr, cloneArrayOrCloneableExpr(param, fieldType));
-        assignStmt = ifElseS(equalsNullX(param), assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION), assignStmt);
+        assignStmt = ifElseS(
+                equalsNullX(param),
+                shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr),
+                assignStmt);
         final Statement assignInit;
         final Expression initExpr = fNode.getInitialValueExpression();
         if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
+            assignInit = shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr);
         } else {
             assignInit = assignS(fieldExpr, cloneArrayOrCloneableExpr(initExpr, fieldType));
         }
         return assignFieldWithDefault(namedArgsMap, fNode, assignStmt, assignInit);
     }
 
-    private static Expression getParam(FieldNode fNode, boolean namedArgs) {
+    private static Expression getParam(final FieldNode fNode, final boolean namedArgs) {
         return namedArgs ? findArg(fNode.getName()) : varX(fNode.getName(), fNode.getType());
     }
 
-    private static Statement createConstructorStatementDate(FieldNode fNode, boolean namedArgs) {
-        final Expression fieldExpr = propX(varX("this"), fNode.getName());
-        Expression initExpr = fNode.getInitialValueExpression();
-        final Statement assignInit;
-        if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
-        } else {
-            assignInit = assignS(fieldExpr, cloneDateExpr(initExpr));
-        }
-        final Expression param = getParam(fNode, namedArgs);
-        Statement assignStmt = assignS(fieldExpr, cloneDateExpr(param));
-        return assignWithDefault(namedArgs, assignInit, param, assignStmt);
-    }
-
-    private static Statement createConstructorStatementDate(FieldNode fNode, Parameter namedArgsMap) {
+    private static Statement createConstructorStatementDate(final FieldNode fNode, final Parameter namedArgsMap, final boolean shouldNullCheck) {
         final Expression fieldExpr = propX(varX("this"), fNode.getName());
         final Expression param = getParam(fNode, namedArgsMap != null);
         Statement assignStmt = assignS(fieldExpr, cloneDateExpr(param));
-        assignStmt = ifElseS(equalsNullX(param), assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION), assignStmt);
+        assignStmt = ifElseS(
+                equalsNullX(param),
+                shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr),
+                assignStmt);
         final Statement assignInit;
         Expression initExpr = fNode.getInitialValueExpression();
         if (initExpr == null || (initExpr instanceof ConstantExpression && ((ConstantExpression) initExpr).isNullExpression())) {
-            assignInit = assignS(fieldExpr, ConstantExpression.EMPTY_EXPRESSION);
+            assignInit = shouldNullCheck ? NullCheckASTTransformation.makeThrowStmt(fNode.getName()) : assignNullS(fieldExpr);
         } else {
             assignInit = assignS(fieldExpr, cloneDateExpr(initExpr));
         }
         return assignFieldWithDefault(namedArgsMap, fNode, assignStmt, assignInit);
     }
 
-    private static boolean isKnownImmutable(String fieldName, List<String> knownImmutables) {
+    private static boolean isKnownImmutable(final String fieldName, final List<String> knownImmutables) {
         return knownImmutables.contains(fieldName);
     }
 
-    protected Statement checkFinalArgNotOverridden(ClassNode cNode, FieldNode fNode) {
-        final String name = fNode.getName();
+    protected Statement checkFinalArgNotOverridden(final ClassNode cNode, final FieldNode fNode) {
+        String name = fNode.getName();
         Expression value = findArg(name);
         return ifS(
                 notX(equalsNullX(value)),
-                throwS(ctorX(READONLYEXCEPTION_TYPE,
-                        args(constX(name), constX(cNode.getName()))
-                )));
+                throwS(
+                        ctorX(READONLYEXCEPTION_TYPE, args(constX(name), constX(cNode.getName())))
+                )
+        );
     }
 }

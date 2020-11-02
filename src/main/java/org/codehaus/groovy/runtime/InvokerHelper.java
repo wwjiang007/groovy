@@ -87,6 +87,8 @@ public class InvokerHelper {
 
     public static final MetaClassRegistry metaRegistry = GroovySystem.getMetaClassRegistry();
     public static final String MAIN_METHOD_NAME = "main";
+    private static final String XMLUTIL_CLASS_FULL_NAME = "groovy.xml.XmlUtil";
+    private static final String SERIALIZE_METHOD_NAME = "serialize";
 
     public static void removeClass(Class clazz) {
         metaRegistry.removeMetaClass(clazz);
@@ -445,6 +447,7 @@ public class InvokerHelper {
     static class NullScript extends Script {
         public NullScript() { this(new Binding()); }
         public NullScript(Binding context) { super(context); }
+        @Override
         public Object run() { return null; }
     }
 
@@ -462,6 +465,7 @@ public class InvokerHelper {
                     // it could just be a class, so let's wrap it in a Script
                     // wrapper; though the bindings will be ignored
                     script = new Script(context) {
+                        @Override
                         public Object run() {
                             Object argsToPass = EMPTY_MAIN_ARGS;
                             try {
@@ -654,7 +658,7 @@ public class InvokerHelper {
         }
         if (arguments instanceof Element) {
             try {
-                Method serialize = Class.forName("groovy.xml.XmlUtil").getMethod("serialize", Element.class);
+                Method serialize = Class.forName(XMLUTIL_CLASS_FULL_NAME).getMethod(SERIALIZE_METHOD_NAME, Element.class);
                 return (String) serialize.invoke(null, arguments);
             } catch (ClassNotFoundException | IllegalAccessException | InvocationTargetException | NoSuchMethodException e) {
                 throw new RuntimeException(e);
@@ -663,8 +667,8 @@ public class InvokerHelper {
         if (arguments instanceof String) {
             if (verbose) {
                 String arg = escapeBackslashes((String) arguments)
-                        .replaceAll("'", "\\\\'");    // single quotation mark
-                return "\'" + arg + "\'";
+                        .replace("'", "\\'");    // single quotation mark
+                return "'" + arg + "'";
             } else {
                 return (String) arguments;
             }
@@ -687,9 +691,9 @@ public class InvokerHelper {
         return orig
                 .replace("\\", "\\\\")           // backslash
                 .replace("\n", "\\n")            // line feed
-                .replaceAll("\\r", "\\\\r")      // carriage return
-                .replaceAll("\\t", "\\\\t")      // tab
-                .replaceAll("\\f", "\\\\f");     // form feed
+                .replace("\r", "\\r")            // carriage return
+                .replace("\t", "\\t")            // tab
+                .replace("\f", "\\f");           // form feed
     }
 
     private static String handleFormattingException(Object item, Exception ex) {
@@ -801,8 +805,8 @@ public class InvokerHelper {
         return argBuf.toString();
     }
 
-    private static Set<String> DEFAULT_IMPORT_PKGS = new HashSet<String>();
-    private static Set<String> DEFAULT_IMPORT_CLASSES = new HashSet<String>();
+    private static final Set<String> DEFAULT_IMPORT_PKGS = new HashSet<String>();
+    private static final Set<String> DEFAULT_IMPORT_CLASSES = new HashSet<String>();
     static {
         for (String pkgName : ResolveVisitor.DEFAULT_IMPORTS) {
             DEFAULT_IMPORT_PKGS.add(pkgName.substring(0, pkgName.length() - 1));

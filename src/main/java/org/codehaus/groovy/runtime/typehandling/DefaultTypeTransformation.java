@@ -299,12 +299,12 @@ public class DefaultTypeTransformation {
                 return n.floatValue();
             }
             if (type == Double.class) {
-                Double answer = n.doubleValue();
+                double answer = n.doubleValue();
                 //throw a runtime exception if conversion would be out-of-range for the type.
                 if (!(n instanceof Double) && (answer == Double.NEGATIVE_INFINITY
                         || answer == Double.POSITIVE_INFINITY)) {
                     throw new GroovyRuntimeException("Automatic coercion of " + n.getClass().getName()
-                            + " value " + n + " to double failed.  Value is out of range.");
+                            + " value " + n + " to double failed. Value is out of range.");
                 }
                 return answer;
             }
@@ -345,12 +345,12 @@ public class DefaultTypeTransformation {
         } else if (type == float.class) {
             return floatUnbox(object);
         } else if (type == double.class) {
-            Double answer = doubleUnbox(object);
+            double answer = doubleUnbox(object);
             //throw a runtime exception if conversion would be out-of-range for the type.
             if (!(object instanceof Double) && (answer == Double.NEGATIVE_INFINITY
                     || answer == Double.POSITIVE_INFINITY)) {
                 throw new GroovyRuntimeException("Automatic coercion of " + object.getClass().getName()
-                        + " value " + object + " to double failed.  Value is out of range.");
+                        + " value " + object + " to double failed. Value is out of range.");
             }
             return answer;
         } //nothing else possible
@@ -480,7 +480,7 @@ public class DefaultTypeTransformation {
     }
 
     public static <T> Collection<T> arrayAsCollection(T[] value) {
-        return Arrays.asList((T[]) value);
+        return Arrays.asList(value);
     }
 
     /**
@@ -589,12 +589,12 @@ public class DefaultTypeTransformation {
                     || (right.getClass() != Object.class && right.getClass().isAssignableFrom(left.getClass()) //GROOVY-4046
                     || right instanceof Comparable) // GROOVY-7954
             ) {
-                Comparable comparable = (Comparable) left;
                 // GROOVY-7876: when comparing for equality we try to only call compareTo when an assignable
                 // relationship holds but with a container/holder class and because of erasure, we might still end
                 // up with the prospect of a ClassCastException which we want to ignore but only if testing equality
                 try {
-                    return comparable.compareTo(right);
+                    // GROOVY-9711: don't rely on Java method selection
+                    return (int) InvokerHelper.invokeMethod(left, "compareTo", right);
                 } catch (ClassCastException cce) {
                     if (!equalityCheckOnly) cause = cce;
                 }

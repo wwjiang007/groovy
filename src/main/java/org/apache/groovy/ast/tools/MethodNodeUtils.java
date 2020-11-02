@@ -21,6 +21,8 @@ package org.apache.groovy.ast.tools;
 import org.codehaus.groovy.ast.ClassHelper;
 import org.codehaus.groovy.ast.MethodNode;
 import org.codehaus.groovy.ast.Parameter;
+import org.codehaus.groovy.ast.stmt.BlockStatement;
+import org.codehaus.groovy.ast.stmt.Statement;
 
 import static org.apache.groovy.util.BeanUtils.decapitalize;
 
@@ -28,6 +30,9 @@ import static org.apache.groovy.util.BeanUtils.decapitalize;
  * Utility class for working with MethodNodes
  */
 public class MethodNodeUtils {
+
+    private MethodNodeUtils() { }
+
     /**
      * Return the method node's descriptor including its
      * name and parameter types without generics.
@@ -35,7 +40,7 @@ public class MethodNodeUtils {
      * @param mNode the method node
      * @return the method node's abbreviated descriptor excluding the return type
      */
-    public static String methodDescriptorWithoutReturnType(MethodNode mNode) {
+    public static String methodDescriptorWithoutReturnType(final MethodNode mNode) {
         StringBuilder sb = new StringBuilder();
         sb.append(mNode.getName()).append(':');
         for (Parameter p : mNode.getParameters()) {
@@ -51,7 +56,7 @@ public class MethodNodeUtils {
      * @param mNode the method node
      * @return the method node's descriptor
      */
-    public static String methodDescriptor(MethodNode mNode) {
+    public static String methodDescriptor(final MethodNode mNode) {
         StringBuilder sb = new StringBuilder(mNode.getName().length() + mNode.getParameters().length * 10);
         sb.append(mNode.getReturnType().getName());
         sb.append(' ');
@@ -74,24 +79,52 @@ public class MethodNodeUtils {
      * @param mNode a MethodNode
      * @return the property name without the get/set/is prefix if a property or null
      */
-    public static String getPropertyName(MethodNode mNode) {
-        String name = mNode.getName();
-        if (name.startsWith("set") || name.startsWith("get") || name.startsWith("is")) {
-            String pname = decapitalize(name.substring(name.startsWith("is") ? 2 : 3));
-            if (!pname.isEmpty()) {
-                if (name.startsWith("set")) {
-                    if (mNode.getParameters().length == 1) {
-                        return pname;
+    public static String getPropertyName(final MethodNode mNode) {
+        final String name = mNode.getName();
+        final int nameLength = name.length();
+        if (nameLength > 2) {
+            switch (name.charAt(0)) {
+                case 'g':
+                    if (nameLength > 3 && name.charAt(1) == 'e' && name.charAt(2) == 't' && mNode.getParameters().length == 0 && !mNode.getReturnType().equals(ClassHelper.VOID_TYPE)) {
+                        return decapitalize(name.substring(3));
                     }
-                } else if (mNode.getParameters().length == 0 && !ClassHelper.VOID_TYPE.equals(mNode.getReturnType())) {
-                    if (name.startsWith("get") || ClassHelper.boolean_TYPE.equals(mNode.getReturnType())) {
-                        return pname;
+                    break;
+                case 's':
+                    if (nameLength > 3 && name.charAt(1) == 'e' && name.charAt(2) == 't' && mNode.getParameters().length == 1 /*&& mNode.getReturnType().equals(ClassHelper.VOID_TYPE)*/) {
+                        return decapitalize(name.substring(3));
                     }
-                }
+                    break;
+                case 'i':
+                    if (name.charAt(1) == 's' && mNode.getParameters().length == 0 && (mNode.getReturnType().equals(ClassHelper.boolean_TYPE) /*|| mNode.getReturnType().equals(ClassHelper.Boolean_TYPE)*/)) {
+                        return decapitalize(name.substring(2));
+                    }
+                    break;
             }
         }
         return null;
     }
 
-    private MethodNodeUtils() { }
+    /**
+     * Gets the code for a method (or constructor) as a block.
+     * If no code is found, an empty block will be returned.
+     * If a single non-block statement is found, a block containing that statement will be returned.
+     * Otherwise the existing block statement will be returned.
+     * The original {@code node} is not modified.
+     *
+     * @param node the method (or constructor) node
+     * @return the found or created block statement
+     */
+    public static BlockStatement getCodeAsBlock(final MethodNode node) {
+        Statement code = node.getCode();
+        BlockStatement block;
+        if (code == null) {
+            block = new BlockStatement();
+        } else if (!(code instanceof BlockStatement)) {
+            block = new BlockStatement();
+            block.addStatement(code);
+        } else {
+            block = (BlockStatement) code;
+        }
+        return block;
+    }
 }

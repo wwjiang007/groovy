@@ -18,6 +18,7 @@
  */
 package org.codehaus.groovy.ant;
 
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import groovy.lang.GroovyClassLoader;
 import org.antlr.v4.runtime.tree.ParseTreeVisitor;
 import org.apache.groovy.io.StringBuilderWriter;
@@ -82,7 +83,7 @@ import java.util.StringTokenizer;
  *   &lt;/taskdef&gt;
  *
  *   &lt;target name="compile" description="compile groovy sources"&gt;
- *     &lt;groovyc srcdir="src" destdir="bin" fork="true" listfiles="true" includeantruntime="false"/&gt;
+ *     &lt;groovyc srcdir="src" destdir="bin" fork="true" listfiles="true" includeantruntime="false"&gt;
  *       &lt;classpath&gt;
  *         &lt;fileset dir="${groovy.home}/lib" includes="groovy-*${groovy.version}.jar" excludes="groovy-ant-${groovy.version}.jar"/&gt;
  *       &lt;/classpath&gt;
@@ -118,7 +119,6 @@ import java.util.StringTokenizer;
  * <li>includeDestClasses</li>
  * <li>jointCompilationOptions</li>
  * <li>stacktrace</li>
- * <li>indy</li>
  * <li>scriptBaseClass</li>
  * <li>stubdir</li>
  * <li>keepStubs</li>
@@ -217,7 +217,6 @@ public class Groovyc extends MatchingTask {
     private File stubDir;
     private boolean keepStubs;
     private boolean forceLookupUnnamedFiles;
-    private boolean useIndy;
     private String scriptBaseClass;
     private String configscript;
 
@@ -704,21 +703,23 @@ public class Groovyc extends MatchingTask {
     }
 
     /**
-     * Set the indy flag.
+     * Legacy method to set the indy flag (only true is allowed)
      *
-     * @param useIndy the indy flag
+     * @param indy true means invokedynamic support is active
      */
-    public void setIndy(boolean useIndy) {
-        this.useIndy = useIndy;
+    @Deprecated
+    public void setIndy(final boolean indy) {
+        if (!indy) {
+            throw new BuildException("Disabling indy is no longer supported!", getLocation());
+        }
     }
 
     /**
-     * Get the value of the indy flag.
-     *
-     * @return if to use indy
+     * Get the value of the indy flag (always true).
      */
+    @Deprecated
     public boolean getIndy() {
-        return this.useIndy;
+        return true;
     }
 
     /**
@@ -862,6 +863,7 @@ public class Groovyc extends MatchingTask {
      *
      * @throws BuildException if an error occurs
      */
+    @Override
     public void execute() throws BuildException {
         checkParameters();
         resetFileLists();
@@ -940,7 +942,7 @@ public class Groovyc extends MatchingTask {
      * @return the list of files as an array
      */
     public File[] getFileList() {
-        return compileList;
+        return Arrays.copyOf(compileList, compileList.length);
     }
 
     protected void checkParameters() throws BuildException {
@@ -1027,10 +1029,13 @@ public class Groovyc extends MatchingTask {
                     || key.equals("source")
                     || key.equals("target")) {
                 switch (key) {
-                case "nativeheaderdir":
-                    key = "h"; break;
-                case "release":
-                    key = "-" + key; // to get "--" when passed to javac
+                    case "nativeheaderdir":
+                        key = "h";
+                        break;
+                    case "release":
+                        key = "-" + key; // to get "--" when passed to javac
+                        break;
+                    default:
                 }
                 // map "depend", "encoding", etc. to "-Jkey=val"
                 jointOptions.add("-J" + key + "=" + getProject().replaceProperties(e.getValue().toString()));
@@ -1101,14 +1106,14 @@ public class Groovyc extends MatchingTask {
             bootstrapClasspath = ((AntClassLoader) loader).getClasspath().split(File.pathSeparator);
         } else {
             Class<?>[] bootstrapClasses = {
-                FileSystemCompilerFacade.class,
-                FileSystemCompiler.class,
-                ParseTreeVisitor.class,
-                ClassVisitor.class,
-                CommandLine.class,
+                    FileSystemCompilerFacade.class,
+                    FileSystemCompiler.class,
+                    ParseTreeVisitor.class,
+                    ClassVisitor.class,
+                    CommandLine.class,
             };
             bootstrapClasspath = Arrays.stream(bootstrapClasses).map(Groovyc::getLocation)
-                .map(uri -> new File(uri).getAbsolutePath()).distinct().toArray(String[]::new);
+                    .map(uri -> new File(uri).getAbsolutePath()).distinct().toArray(String[]::new);
         }
         if (bootstrapClasspath.length > 0) {
             commandLineList.add("-classpath");
@@ -1153,7 +1158,7 @@ public class Groovyc extends MatchingTask {
                 sb.append(File.pathSeparatorChar);
             }
             if (next.startsWith(baseDir)) {
-                sb.append(".").append(next.substring(baseDir.length()));
+                sb.append(".").append(next, baseDir.length(), next.length());
             } else {
                 sb.append(next);
             }
@@ -1202,9 +1207,6 @@ public class Groovyc extends MatchingTask {
         if (previewFeatures) {
             commandLineList.add("--enable-preview");
         }
-        if (useIndy) {
-            commandLineList.add("--indy");
-        }
         if (scriptBaseClass != null) {
             commandLineList.add("-b");
             commandLineList.add(scriptBaseClass);
@@ -1233,7 +1235,7 @@ public class Groovyc extends MatchingTask {
             try {
                 File tempFile = File.createTempFile("groovyc-files-", ".txt");
                 temporaryFiles.add(tempFile);
-                PrintWriter pw = new PrintWriter(new FileWriter(tempFile));
+                PrintWriter pw = printWriter(tempFile);
                 for (File srcFile : compileList) {
                     pw.println(srcFile.getPath());
                 }
@@ -1247,6 +1249,12 @@ public class Groovyc extends MatchingTask {
                 commandLineList.add(srcFile.getPath());
             }
         }
+    }
+
+    @SuppressFBWarnings(value = "DM_DEFAULT_ENCODING", justification = "This is only used to store filenames when exceeding a particular length limit when in fork mode")
+    private PrintWriter printWriter(File tempFile) throws IOException {
+        // we could make a forkFileListEncoding but seems like a rare scenario
+        return new PrintWriter(new FileWriter(tempFile));
     }
 
     private String[] makeCommandLine(List<String> commandLineList) {
@@ -1405,7 +1413,7 @@ public class Groovyc extends MatchingTask {
         ClassLoader loader = getClass().getClassLoader();
         if (loader instanceof AntClassLoader) {
             AntClassLoader antLoader = (AntClassLoader) loader;
-            String[] pathElm = antLoader.getClasspath().split(File.pathSeparator);
+            String[] pathElm = antLoader.getClasspath().split(File.pathSeparator, -1);
             List<String> classpath = configuration.getClasspath();
             /*
              * Iterate over the classpath provided to groovyc, and add any missing path

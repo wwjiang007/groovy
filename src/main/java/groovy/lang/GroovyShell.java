@@ -128,6 +128,7 @@ public class GroovyShell extends GroovyObjectSupport {
         return loader;
     }
 
+    @Override
     public Object getProperty(String property) {
         Object answer = getVariable(property);
         if (answer == null) {
@@ -136,6 +137,7 @@ public class GroovyShell extends GroovyObjectSupport {
         return answer;
     }
 
+    @Override
     public void setProperty(String property, Object newValue) {
         setVariable(property, newValue);
         try {
@@ -145,18 +147,14 @@ public class GroovyShell extends GroovyObjectSupport {
         }
     }
 
-    //
-    // FIXME: Use List<String> here, current version is not safe
-    //
-
     /**
      * A helper method which runs the given script file with the given command line arguments
      *
      * @param scriptFile the file of the script to run
      * @param list       the command line arguments to pass in
      */
-    public Object run(File scriptFile, List list) throws CompilationFailedException, IOException {
-        return run(scriptFile, (String[]) list.toArray(EMPTY_STRING_ARRAY));
+    public Object run(File scriptFile, List<String> list) throws CompilationFailedException, IOException {
+        return run(scriptFile, list.toArray(EMPTY_STRING_ARRAY));
     }
 
     /**
@@ -166,8 +164,8 @@ public class GroovyShell extends GroovyObjectSupport {
      * @param fileName   is the logical file name of the script (which is used to create the class name of the script)
      * @param list       the command line arguments to pass in
      */
-    public Object run(String scriptText, String fileName, List list) throws CompilationFailedException {
-        return run(scriptText, fileName, (String[]) list.toArray(EMPTY_STRING_ARRAY));
+    public Object run(String scriptText, String fileName, List<String> list) throws CompilationFailedException {
+        return run(scriptText, fileName, list.toArray(EMPTY_STRING_ARRAY));
     }
 
     /**
@@ -178,7 +176,7 @@ public class GroovyShell extends GroovyObjectSupport {
      */
     public Object run(final File scriptFile, String[] args) throws CompilationFailedException, IOException {
         String scriptName = scriptFile.getName();
-        int p = scriptName.lastIndexOf(".");
+        int p = scriptName.lastIndexOf('.');
         if (p++ >= 0) {
             if (scriptName.substring(p).equals("java")) {
                 throw new CompilationFailedException(0, null);
@@ -196,6 +194,7 @@ public class GroovyShell extends GroovyObjectSupport {
                 classLoader = loader;
             }
 
+            @Override
             public Object run() {
                 thread.setContextClassLoader(classLoader);
                 return null;
@@ -349,8 +348,8 @@ public class GroovyShell extends GroovyObjectSupport {
      * @param source    is the source content of the script
      * @param args      the command line arguments to pass in
      */
-    public Object run(GroovyCodeSource source, List args) throws CompilationFailedException {
-        return run(source, ((String[]) args.toArray(EMPTY_STRING_ARRAY)));
+    public Object run(GroovyCodeSource source, List<String> args) throws CompilationFailedException {
+        return run(source, args.toArray(EMPTY_STRING_ARRAY));
     }
 
     /**
@@ -370,8 +369,8 @@ public class GroovyShell extends GroovyObjectSupport {
      * @param source    is the source content of the script
      * @param args      the command line arguments to pass in
      */
-    public Object run(URI source, List args) throws CompilationFailedException, IOException {
-        return run(new GroovyCodeSource(source), ((String[]) args.toArray(EMPTY_STRING_ARRAY)));
+    public Object run(URI source, List<String> args) throws CompilationFailedException, IOException {
+        return run(new GroovyCodeSource(source), args.toArray(EMPTY_STRING_ARRAY));
     }
 
     /**
@@ -391,8 +390,8 @@ public class GroovyShell extends GroovyObjectSupport {
      * @param fileName is the logical file name of the script (which is used to create the class name of the script)
      * @param list     the command line arguments to pass in
      */
-    public Object run(final Reader in, final String fileName, List list) throws CompilationFailedException {
-        return run(in, fileName, (String[]) list.toArray(EMPTY_STRING_ARRAY));
+    public Object run(final Reader in, final String fileName, List<String> list) throws CompilationFailedException {
+        return run(in, fileName, list.toArray(EMPTY_STRING_ARRAY));
     }
 
     /**

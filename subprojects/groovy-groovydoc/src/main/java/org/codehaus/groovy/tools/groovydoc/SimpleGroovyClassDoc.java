@@ -74,6 +74,8 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         TAG_TEXT.put("author", "Authors");
         TAG_TEXT.put("version", "Version");
         TAG_TEXT.put("default", "Default");
+        // typeparam is used internally as a specialization of param to separate type params from regular params.
+        TAG_TEXT.put("typeparam", "Type Parameters");
     }
     private final List<GroovyConstructorDoc> constructors;
     private final List<GroovyFieldDoc> fields;
@@ -122,6 +124,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     /**
      * returns a sorted array of constructors
      */
+    @Override
     public GroovyConstructorDoc[] constructors() {
         Collections.sort(constructors);
         return constructors.toArray(EMPTY_GROOVYCONSTRUCTORDOC_ARRAY);
@@ -151,6 +154,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     /**
      * returns a sorted array of nested classes and interfaces
      */
+    @Override
     public GroovyClassDoc[] innerClasses() {
         Collections.sort(nested);
         return nested.toArray(EMPTY_GROOVYCLASSDOC_ARRAY);
@@ -163,6 +167,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     /**
      * returns a sorted array of fields
      */
+    @Override
     public GroovyFieldDoc[] fields() {
         Collections.sort(fields);
         return fields.toArray(EMPTY_GROOVYFIELDDOC_ARRAY);
@@ -175,6 +180,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     /**
      * returns a sorted array of properties
      */
+    @Override
     public GroovyFieldDoc[] properties() {
         Collections.sort(properties);
         return properties.toArray(EMPTY_GROOVYFIELDDOC_ARRAY);
@@ -187,6 +193,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     /**
      * returns a sorted array of enum constants
      */
+    @Override
     public GroovyFieldDoc[] enumConstants() {
         Collections.sort(enumConstants);
         return enumConstants.toArray(EMPTY_GROOVYFIELDDOC_ARRAY);
@@ -199,6 +206,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     /**
      * returns a sorted array of methods
      */
+    @Override
     public GroovyMethodDoc[] methods() {
         Collections.sort(methods);
         return methods.toArray(EMPTY_GROOVYMETHODDOC_ARRAY);
@@ -216,6 +224,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         superClassName = className;
     }
 
+    @Override
     public GroovyClassDoc superclass() {
         return superClass;
     }
@@ -224,6 +233,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         superClass = doc;
     }
 
+    @Override
     public String getFullPathName() {
         return fullPathName;
     }
@@ -232,6 +242,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         this.fullPathName = fullPathName;
     }
 
+    @Override
     public String getRelativeRootPath() {
         StringTokenizer tokenizer = new StringTokenizer(fullPathName, "/"); // todo windows??
         StringBuilder sb = new StringBuilder();
@@ -454,10 +465,10 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         if (type.startsWith("? super ")) return "? super " + getDocUrl(type.substring(8), full, links, relativePath, rootDoc, classDoc);
 
         String label = null;
-        int lt = type.indexOf("<");
+        int lt = type.indexOf('<');
         if (lt != -1) {
             String outerType = type.substring(0, lt);
-            int gt = type.lastIndexOf(">");
+            int gt = type.lastIndexOf('>');
             if (gt != -1) {
                 if (gt > lt) {
                     String allTypeArgs = type.substring(lt + 1, gt);
@@ -487,7 +498,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
                     sb.append("&gt;");
                     return sb.toString();
                 }
-                return type.replaceAll("<", "&lt;").replaceAll(">", "&gt;");
+                return type.replace("<", "&lt;").replace(">", "&gt;");
             }
         }
         Matcher matcher = REF_LABEL_REGEX.matcher(type);
@@ -500,13 +511,14 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
             return "<a href='" + resolveMethodArgs(rootDoc, classDoc, type) + "'>" + (label == null ? type.substring(1) : label) + "</a>";
 
         if (type.endsWith("[]")) {
+            String componentType = type.substring(0, type.length() - 2);
             if (label != null)
-                return getDocUrl(type.substring(0, type.length() - 2) + " " + label, full, links, relativePath, rootDoc, classDoc);
-            return getDocUrl(type.substring(0, type.length() - 2), full, links, relativePath, rootDoc, classDoc) + "[]";
+                return getDocUrl(componentType + " " + label, full, links, relativePath, rootDoc, classDoc);
+            return getDocUrl(componentType, full, links, relativePath, rootDoc, classDoc) + "[]";
         }
 
         if (!type.contains(".") && classDoc != null) {
-            String[] pieces = type.split("#");
+            String[] pieces = type.split("#", -1);
             String candidate = pieces[0];
             Class c = classDoc.resolveExternalClassFromImport(candidate);
             if (c != null) type = c.getName();
@@ -516,12 +528,12 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
 
         final String[] target = type.split("#");
         String shortClassName = target[0].replaceAll(".*\\.", "");
-        shortClassName += (target.length > 1 ? "#" + target[1].split("\\(")[0] : "");
-        String name = (full ? target[0] : shortClassName).replaceAll("#", ".").replace('$', '.');
+        shortClassName += (target.length > 1 ? "#" + target[1].split("\\(", -1)[0] : "");
+        String name = (full ? target[0] : shortClassName).replace('#', '.').replace('$', '.');
 
         // last chance lookup for classes within the current codebase
         if (rootDoc != null) {
-            String slashedName = target[0].replaceAll("\\.", "/");
+            String slashedName = target[0].replace('.', '/');
             GroovyClassDoc doc = rootDoc.classNamed(classDoc, slashedName);
             if (doc != null) {
                 target[0] = doc.getFullPathName(); // if we added a package
@@ -555,13 +567,19 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
 
     private GroovyClassDoc resolveClass(GroovyRootDoc rootDoc, String name) {
         if (isPrimitiveType(name)) return null;
-        Map<String, GroovyClassDoc> resolvedClasses = rootDoc.getResolvedClasses();
-        GroovyClassDoc groovyClassDoc = resolvedClasses.get(name);
-        if (groovyClassDoc != null) {
-            return groovyClassDoc;
+        GroovyClassDoc groovyClassDoc;
+        Map<String, GroovyClassDoc> resolvedClasses = null;
+        if (rootDoc != null) {
+            resolvedClasses = rootDoc.getResolvedClasses();
+            groovyClassDoc = resolvedClasses.get(name);
+            if (groovyClassDoc != null) {
+                return groovyClassDoc;
+            }
         }
         groovyClassDoc = doResolveClass(rootDoc, name);
-        resolvedClasses.put(name, groovyClassDoc);
+        if (resolvedClasses != null) {
+            resolvedClasses.put(name, groovyClassDoc);
+        }
         return groovyClassDoc;
     }
 
@@ -574,18 +592,22 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
 //        if (name.equals("T") || name.equals("U") || name.equals("K") || name.equals("V") || name.equals("G")) {
 //            name = "java/lang/Object";
 //        }
-        GroovyClassDoc doc = ((SimpleGroovyRootDoc)rootDoc).classNamedExact(name);
-        if (doc != null) return doc;
-        int slashIndex = name.lastIndexOf("/");
-        if (slashIndex < 1) {
-            doc = resolveInternalClassDocFromImport(rootDoc, name);
+        int slashIndex = name.lastIndexOf('/');
+        if (rootDoc != null) {
+            GroovyClassDoc doc = ((SimpleGroovyRootDoc)rootDoc).classNamedExact(name);
             if (doc != null) return doc;
-            for (GroovyClassDoc nestedDoc : nested) {
-                if (nestedDoc.name().endsWith("." + name))
-                    return nestedDoc;
+            if (slashIndex < 1) {
+                doc = resolveInternalClassDocFromImport(rootDoc, name);
+                if (doc != null) return doc;
+                doc = resolveInternalClassDocFromSamePackage(rootDoc, name);
+                if (doc != null) return doc;
+                for (GroovyClassDoc nestedDoc : nested) {
+                    if (nestedDoc.name().endsWith("." + name))
+                        return nestedDoc;
+                }
+                doc = rootDoc.classNamed(this, name);
+                if (doc != null) return doc;
             }
-            doc = rootDoc.classNamed(this, name);
-            if (doc != null) return doc;
         }
 
         // The class is not in the tree being documented
@@ -671,6 +693,15 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         return null;
     }
 
+    private GroovyClassDoc resolveInternalClassDocFromSamePackage(GroovyRootDoc rootDoc, String baseName) {
+        if (isPrimitiveType(baseName)) return null;
+        if (baseName.contains(".")) return null;
+        int lastSlash = fullPathName.lastIndexOf('/');
+        if (lastSlash < 0) return null;
+        String pkg = fullPathName.substring(0, lastSlash + 1);
+        return ((SimpleGroovyRootDoc)rootDoc).classNamedExact(pkg + baseName);
+    }
+
     private Class resolveExternalClassFromImport(String name) {
         if (isPrimitiveType(name)) return null;
         Class<?> clazz = resolvedExternalClassesCache.get(name);
@@ -688,7 +719,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         for (String importName : importedClassesAndPackages) {
             String candidate = null;
             if (importName.endsWith("/" + name)) {
-                candidate = importName.replaceAll("/", ".");
+                candidate = importName.replace('/', '.');
             } else if (importName.endsWith("/*")) {
                 candidate = importName.substring(0, importName.length() - 2).replace('/', '.') + "." + name;
             }
@@ -726,67 +757,83 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
 
     // methods from GroovyClassDoc
 
+    @Override
     public GroovyConstructorDoc[] constructors(boolean filter) {/*todo*/
         return null;
     }
 
+    @Override
     public boolean definesSerializableFields() {/*todo*/
         return false;
     }
 
+    @Override
     public GroovyFieldDoc[] fields(boolean filter) {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyClassDoc findClass(String className) {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyClassDoc[] importedClasses() {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyPackageDoc[] importedPackages() {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyClassDoc[] innerClasses(boolean filter) {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyClassDoc[] interfaces() {
         Collections.sort(interfaceClasses);
         return interfaceClasses.toArray(EMPTY_GROOVYCLASSDOC_ARRAY);
     }
 
+    @Override
     public GroovyType[] interfaceTypes() {/*todo*/
         return null;
     }
 
+    @Override
     public boolean isExternalizable() {/*todo*/
         return false;
     }
 
+    @Override
     public boolean isSerializable() {/*todo*/
         return false;
     }
 
+    @Override
     public GroovyMethodDoc[] methods(boolean filter) {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyFieldDoc[] serializableFields() {/*todo*/
         return null;
     }
 
+    @Override
     public GroovyMethodDoc[] serializationMethods() {/*todo*/
         return null;
     }
 
+    @Override
     public boolean subclassOf(GroovyClassDoc gcd) {/*todo*/
         return false;
     }
 
+    @Override
     public GroovyType superclassType() {/*todo*/
         return null;
     }
@@ -802,16 +849,19 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
 //    public GroovyWildcardType asWildcardType() {/*todo*/return null;}
 //    public String dimension() {/*todo*/ return null; }
 
+    @Override
     public boolean isPrimitive() {/*todo*/
         return false;
     }
 
+    @Override
     public String qualifiedTypeName() {
         String qtnWithSlashes = fullPathName.startsWith("DefaultPackage/") ? fullPathName.substring("DefaultPackage/".length()) : fullPathName;
         return qtnWithSlashes.replace('/', '.');
     }
 
     // TODO remove dupe with SimpleGroovyType
+    @Override
     public String simpleTypeName() {
         String typeName = qualifiedTypeName();
         int lastDot = typeName.lastIndexOf('.');
@@ -819,20 +869,23 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
         return typeName.substring(lastDot + 1);
     }
 
-    public String typeName() {/*todo*/
-        return null;
+    @Override
+    public String typeName() {
+        return qualifiedTypeName();
     }
 
     public void addInterfaceName(String className) {
         interfaceNames.add(className);
     }
 
+    @Override
     public String firstSentenceCommentText() {
         if (super.firstSentenceCommentText() == null)
             setFirstSentenceCommentText(replaceTags(calculateFirstSentence(getRawCommentText())));
         return super.firstSentenceCommentText();
     }
 
+    @Override
     public String commentText() {
         if (super.commentText() == null)
             setCommentText(replaceTags(getRawCommentText()));
@@ -896,7 +949,7 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     // TODO: is there a better way to do this?
     public String replaceAllTagsCollated(String self, String preKey, String postKey,
                                          String valueSeparator, String postValues, Pattern regex) {
-        Matcher matcher = regex.matcher(self + "@endMarker");
+        Matcher matcher = regex.matcher(self + " @endMarker");
         if (matcher.find()) {
             matcher.reset();
             Map<String, List<String>> savedTags = new LinkedHashMap<String, List<String>>();
@@ -908,18 +961,20 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
                     if ("see".equals(tagname) || "link".equals(tagname)) {
                         content = getDocUrl(content);
                     } else if ("param".equals(tagname)) {
-                        int index = content.indexOf(" ");
+                        int index = content.indexOf(' ');
                         if (index >= 0) {
-                            content = "<code>" + content.substring(0, index) + "</code> - " + content.substring(index);
+                            String paramName = content.substring(0, index);
+                            String paramDesc = content.substring(index);
+                            if (paramName.startsWith("<") && paramName.endsWith(">")) {
+                                paramName = paramName.substring(1, paramName.length() - 1);
+                                tagname = "typeparam";
+                            }
+                            content = "<code>" + paramName + "</code> - " + paramDesc;
                         }
                     }
                     if (TAG_TEXT.containsKey(tagname)) {
                         String text = TAG_TEXT.get(tagname);
-                        List<String> contents = savedTags.get(text);
-                        if (contents == null) {
-                            contents = new ArrayList<String>();
-                            savedTags.put(text, contents);
-                        }
+                        List<String> contents = savedTags.computeIfAbsent(text, k -> new ArrayList<String>());
                         contents.add(content);
                         matcher.appendReplacement(sb, "");
                     } else {
@@ -973,11 +1028,11 @@ public class SimpleGroovyClassDoc extends SimpleGroovyAbstractableElementDoc imp
     }
 
     public static String encodeSpecialSymbols(String text) {
-        return Matcher.quoteReplacement(text.replaceAll("@", "&at;"));
+        return Matcher.quoteReplacement(text.replace("@", "&at;"));
     }
 
     public static String decodeSpecialSymbols(String text) {
-        return text.replaceAll("&at;", "@");
+        return text.replace("&at;", "@");
     }
 
     public void setNameWithTypeArgs(String nameWithTypeArgs) {

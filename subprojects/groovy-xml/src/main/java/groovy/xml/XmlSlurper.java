@@ -45,9 +45,12 @@ import java.io.InputStream;
 import java.io.Reader;
 import java.io.StringReader;
 import java.net.URL;
+import java.nio.file.Files;
+import java.nio.file.Path;
 import java.util.HashMap;
 import java.util.Map;
 import java.util.Stack;
+
 
 /**
  * Parse XML into a document tree that may be traversed similar to XPath
@@ -268,6 +271,10 @@ public class XmlSlurper extends DefaultHandler {
         return parse(new InputSource(uri));
     }
 
+    public GPathResult parse(final Path path) throws IOException, SAXException {
+       return parse(Files.newInputStream(path));
+    }
+
     /**
      * A helper method to parse the given text as XML
      *
@@ -339,11 +346,7 @@ public class XmlSlurper extends DefaultHandler {
      * @param base The URL used to resolve relative URLs
      */
     public void setEntityBaseUrl(final URL base) {
-        reader.setEntityResolver(new EntityResolver() {
-            public InputSource resolveEntity(final String publicId, final String systemId) throws IOException {
-                return new InputSource(new URL(base, systemId).openStream());
-            }
-        });
+        reader.setEntityResolver((publicId, systemId) -> new InputSource(new URL(base, systemId).openStream()));
     }
 
     /* (non-Javadoc)
@@ -373,6 +376,7 @@ public class XmlSlurper extends DefaultHandler {
     /* (non-Javadoc)
     * @see org.xml.sax.ContentHandler#startDocument()
     */
+    @Override
     public void startDocument() throws SAXException {
         currentNode = null;
         charBuffer.setLength(0);
@@ -381,6 +385,7 @@ public class XmlSlurper extends DefaultHandler {
     /* (non-Javadoc)
     * @see org.xml.sax.helpers.DefaultHandler#startPrefixMapping(java.lang.String, java.lang.String)
     */
+    @Override
     public void startPrefixMapping(final String tag, final String uri) throws SAXException {
         if (namespaceAware) namespaceTagHints.put(tag, uri);
     }
@@ -388,6 +393,7 @@ public class XmlSlurper extends DefaultHandler {
     /* (non-Javadoc)
     * @see org.xml.sax.ContentHandler#startElement(java.lang.String, java.lang.String, java.lang.String, org.xml.sax.Attributes)
     */
+    @Override
     public void startElement(final String namespaceURI, final String localName, final String qName, final Attributes atts) throws SAXException {
         addCdata();
 
@@ -420,13 +426,15 @@ public class XmlSlurper extends DefaultHandler {
         currentNode = newElement;
     }
 
-    public void ignorableWhitespace(char buffer[], int start, int len) throws SAXException {
+    @Override
+    public void ignorableWhitespace(char[] buffer, int start, int len) throws SAXException {
         if (keepIgnorableWhitespace) characters(buffer, start, len);
     }
 
     /* (non-Javadoc)
     * @see org.xml.sax.ContentHandler#characters(char[], int, int)
     */
+    @Override
     public void characters(final char[] ch, final int start, final int length) throws SAXException {
         charBuffer.append(ch, start, length);
     }
@@ -434,6 +442,7 @@ public class XmlSlurper extends DefaultHandler {
     /* (non-Javadoc)
     * @see org.xml.sax.ContentHandler#endElement(java.lang.String, java.lang.String, java.lang.String)
     */
+    @Override
     public void endElement(final String namespaceURI, final String localName, final String qName) throws SAXException {
         addCdata();
         Node oldCurrentNode = stack.pop();
@@ -445,6 +454,7 @@ public class XmlSlurper extends DefaultHandler {
     /* (non-Javadoc)
     * @see org.xml.sax.ContentHandler#endDocument()
     */
+    @Override
     public void endDocument() throws SAXException {
     }
 

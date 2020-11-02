@@ -18,8 +18,9 @@
  */
 package groovy.ant;
 
-import groovy.util.BuilderSupport;
+import edu.umd.cs.findbugs.annotations.SuppressFBWarnings;
 import groovy.namespace.QName;
+import groovy.util.BuilderSupport;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.BuildLogger;
 import org.apache.tools.ant.DemuxInputStream;
@@ -102,7 +103,7 @@ public class AntBuilder extends BuilderSupport {
         /*
          * GROOVY-4524: The following is not needed anymore as an ant Project already by default has inputhandler
          * set to DefaultInputHandler. And if it is again set here, it mistakenly overrides the custom input handler
-         * if set using -inputhandler switch. 
+         * if set using -inputhandler switch.
          */
         //this.project.setInputHandler(new DefaultInputHandler());
 
@@ -202,6 +203,7 @@ public class AntBuilder extends BuilderSupport {
         return project;
     }
 
+    @Override
     protected void setParent(Object parent, Object child) {
     }
 
@@ -211,6 +213,7 @@ public class AntBuilder extends BuilderSupport {
      *
      * @see groovy.util.BuilderSupport#doInvokeMethod(java.lang.String, java.lang.Object, java.lang.Object)
      */
+    @Override
     protected Object doInvokeMethod(String methodName, Object name, Object args) {
         super.doInvokeMethod(methodName, name, args);
 
@@ -229,6 +232,8 @@ public class AntBuilder extends BuilderSupport {
      * @param parent note: null when node is root
      * @param node   the node that now has all its children applied
      */
+    @Override
+    @SuppressFBWarnings(value = "DLS_DEAD_LOCAL_STORE", justification = "False positive: bytecode needlessly but harmlessly assigns local to JVM register")
     protected void nodeCompleted(final Object parent, final Object node) {
         if (parent == null) insideTask = false;
         antElementHandler.onEndElement(null, null, antXmlContext);
@@ -255,7 +260,7 @@ public class AntBuilder extends BuilderSupport {
             if (saveStreams) {
                 // save original streams
                 synchronized (AntBuilder.class) {
-                    int currentStreamCount = streamCount++;
+                    int currentStreamCount = streamCount++; // SuppressFBWarnings: DLS_DEAD_LOCAL_STORE
                     if (currentStreamCount == 0) {
                         // we are first, save the streams
                         savedProjectInputStream = project.getDefaultInputStream();
@@ -269,9 +274,9 @@ public class AntBuilder extends BuilderSupport {
                             System.setIn(demuxInputStream);
                         }
                         demuxOutputStream = new DemuxOutputStream(project, false);
-                        System.setOut(new PrintStream(demuxOutputStream));
+                        System.setOut(printStream(demuxOutputStream));
                         demuxErrorStream = new DemuxOutputStream(project, true);
-                        System.setErr(new PrintStream(demuxErrorStream));
+                        System.setErr(printStream(demuxErrorStream));
                     }
                 }
             }
@@ -314,6 +319,12 @@ public class AntBuilder extends BuilderSupport {
         }
     }
 
+    @SuppressFBWarnings(value = "DM_DEFAULT_ENCODING", justification = "We are only wrapping stdout/stderr which are likely created with default encoding")
+    private PrintStream printStream(DemuxOutputStream outputStream) {
+        // we could make a saveStreamEncoding but seems like a rare scenario
+        return new PrintStream(outputStream);
+    }
+
     // Copied from org.apache.tools.ant.Task, since we need to get a real thing before it gets nulled in DispatchUtils.execute
 
     private Object performTask(Task task) {
@@ -335,31 +346,26 @@ public class AntBuilder extends BuilderSupport {
             DispatchUtils.execute(task);
 
             return realThing != null ? realThing : task;
-        }
-        catch (BuildException ex) {
+        } catch (BuildException ex) {
             if (ex.getLocation() == Location.UNKNOWN_LOCATION) {
                 ex.setLocation(task.getLocation());
             }
             reason = ex;
             throw ex;
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             reason = ex;
             BuildException be = new BuildException(ex);
             be.setLocation(task.getLocation());
             throw be;
-        }
-        catch (Error ex) {
+        } catch (Error ex) {
             reason = ex;
             throw ex;
-        }
-        finally {
+        } finally {
             try {
                 final Method fireTaskFinished = Project.class.getDeclaredMethod("fireTaskFinished", Task.class, Throwable.class);
                 ReflectionUtils.trySetAccessible(fireTaskFinished);
                 fireTaskFinished.invoke(project, task, reason);
-            }
-            catch (Exception e) {
+            } catch (Exception e) {
                 BuildException be = new BuildException(e);
                 be.setLocation(task.getLocation());
                 throw be;
@@ -367,16 +373,19 @@ public class AntBuilder extends BuilderSupport {
         }
     }
 
+    @Override
     protected Object createNode(Object tagName) {
         return createNode(tagName, Collections.EMPTY_MAP);
     }
 
+    @Override
     protected Object createNode(Object name, Object value) {
         Object task = createNode(name);
         setText(task, value.toString());
         return task;
     }
 
+    @Override
     protected Object createNode(Object name, Map attributes, Object value) {
         Object task = createNode(name, attributes);
         setText(task, value.toString());
@@ -400,6 +409,7 @@ public class AntBuilder extends BuilderSupport {
         return attr;
     }
 
+    @Override
     protected Object createNode(final Object name, final Map attributes) {
 
         final Attributes attrs = buildAttributes(attributes);
@@ -423,8 +433,7 @@ public class AntBuilder extends BuilderSupport {
 
         try {
             antElementHandler.onStartElement(ns, tagName, tagName, attrs, antXmlContext);
-        }
-        catch (final SAXParseException e) {
+        } catch (final SAXParseException e) {
             log.log(Level.SEVERE, "Caught: " + e, e);
         }
 
@@ -434,33 +443,26 @@ public class AntBuilder extends BuilderSupport {
     }
 
     private Target onDefineTarget(final Attributes attrs, String tagName, String ns) {
-        final Target target = new Target();
-        target.setProject(project);
-        target.setLocation(new Location(antXmlContext.getLocator()));
         try {
             antTargetHandler.onStartElement(ns, tagName, tagName, attrs, antXmlContext);
             final Target newTarget = getProject().getTargets().get(attrs.getValue("name"));
             antXmlContext.setCurrentTarget(newTarget);
             definingTarget = newTarget;
             return newTarget;
-        }
-        catch (final SAXParseException e) {
+        } catch (final SAXParseException e) {
             log.log(Level.SEVERE, "Caught: " + e, e);
+            return null;
         }
-        return null;
     }
 
     private Target onStartTarget(final Attributes attrs, String tagName, String ns) {
-        final Target target = new Target();
-        target.setProject(project);
-        target.setLocation(new Location(antXmlContext.getLocator()));
         try {
             antTargetHandler.onStartElement(ns, tagName, tagName, attrs, antXmlContext);
             final Target newTarget = getProject().getTargets().get(attrs.getValue("name"));
 
             // execute dependencies (if any)
             final Vector<Target> targets = new Vector<Target>();
-            for (final Enumeration<String> deps = newTarget.getDependencies(); deps.hasMoreElements();) {
+            for (final Enumeration<String> deps = newTarget.getDependencies(); deps.hasMoreElements(); ) {
                 final String targetName = deps.nextElement();
                 targets.add(project.getTargets().get(targetName));
             }
@@ -468,19 +470,17 @@ public class AntBuilder extends BuilderSupport {
 
             antXmlContext.setCurrentTarget(newTarget);
             return newTarget;
-        }
-        catch (final SAXParseException e) {
+        } catch (final SAXParseException e) {
             log.log(Level.SEVERE, "Caught: " + e, e);
+            return null;
         }
-        return null;
     }
 
     protected void setText(Object task, String text) {
         final char[] characters = text.toCharArray();
         try {
             antElementHandler.characters(characters, 0, characters.length, antXmlContext);
-        }
-        catch (final SAXParseException e) {
+        } catch (final SAXParseException e) {
             log.log(Level.WARNING, "SetText failed: " + task + ". Reason: " + e, e);
         }
     }
@@ -495,18 +495,22 @@ public class AntBuilder extends BuilderSupport {
  * In a first time, without info
  */
 class AntBuilderLocator implements Locator {
+    @Override
     public int getColumnNumber() {
         return 0;
     }
 
+    @Override
     public int getLineNumber() {
         return 0;
     }
 
+    @Override
     public String getPublicId() {
         return "";
     }
 
+    @Override
     public String getSystemId() {
         return "";
     }

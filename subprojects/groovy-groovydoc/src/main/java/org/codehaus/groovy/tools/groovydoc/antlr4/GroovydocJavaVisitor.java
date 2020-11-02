@@ -22,20 +22,30 @@ import com.github.javaparser.ast.ImportDeclaration;
 import com.github.javaparser.ast.Modifier;
 import com.github.javaparser.ast.NodeList;
 import com.github.javaparser.ast.body.AnnotationDeclaration;
+import com.github.javaparser.ast.body.AnnotationMemberDeclaration;
 import com.github.javaparser.ast.body.CallableDeclaration;
 import com.github.javaparser.ast.body.ClassOrInterfaceDeclaration;
 import com.github.javaparser.ast.body.ConstructorDeclaration;
+import com.github.javaparser.ast.body.EnumConstantDeclaration;
 import com.github.javaparser.ast.body.EnumDeclaration;
 import com.github.javaparser.ast.body.FieldDeclaration;
 import com.github.javaparser.ast.body.MethodDeclaration;
 import com.github.javaparser.ast.body.Parameter;
+import com.github.javaparser.ast.body.TypeDeclaration;
+import com.github.javaparser.ast.expr.AnnotationExpr;
 import com.github.javaparser.ast.expr.Name;
+import com.github.javaparser.ast.nodeTypes.NodeWithAnnotations;
+import com.github.javaparser.ast.type.ClassOrInterfaceType;
 import com.github.javaparser.ast.type.Type;
+import com.github.javaparser.ast.type.TypeParameter;
 import com.github.javaparser.ast.visitor.VoidVisitorAdapter;
+import org.codehaus.groovy.GroovyBugError;
 import org.codehaus.groovy.control.ResolveVisitor;
 import org.codehaus.groovy.groovydoc.GroovyClassDoc;
+import org.codehaus.groovy.runtime.DefaultGroovyMethods;
 import org.codehaus.groovy.tools.groovydoc.LinkArgument;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyAbstractableElementDoc;
+import org.codehaus.groovy.tools.groovydoc.SimpleGroovyAnnotationRef;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyClassDoc;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyConstructorDoc;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyDoc;
@@ -43,6 +53,7 @@ import org.codehaus.groovy.tools.groovydoc.SimpleGroovyExecutableMemberDoc;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyFieldDoc;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyMethodDoc;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyParameter;
+import org.codehaus.groovy.tools.groovydoc.SimpleGroovyProgramElementDoc;
 import org.codehaus.groovy.tools.groovydoc.SimpleGroovyType;
 
 import java.util.ArrayList;
@@ -68,24 +79,11 @@ public class GroovydocJavaVisitor extends VoidVisitorAdapter<Object> {
     @Override
     public void visit(ImportDeclaration n, Object arg) {
         Optional<Name> qualPath = n.getName().getQualifier();
-        String qual = qualPath.map(value -> value.asString().replaceAll("\\.", "/") + "/").orElse("");
+        String qual = qualPath.map(value -> value.asString().replace('.', '/') + "/").orElse("");
         String id = n.getName().getIdentifier();
         String name = qual + id;
         imports.add(name);
         aliases.put(id, name);
-        super.visit(n, arg);
-    }
-
-    @Override
-    public void visit(AnnotationDeclaration n, Object arg) {
-        List<String> imports = getImports();
-        currentClassDoc = new SimpleGroovyClassDoc(imports, aliases, n.getNameAsString(), links);
-        setModifiers(n.getModifiers(), currentClassDoc);
-        currentClassDoc.setTokenType(SimpleGroovyDoc.ANNOTATION_DEF);
-        currentClassDoc.setFullPathName(withSlashes(packagePath + FS + n.getNameAsString()));
-        n.getJavadocComment().ifPresent(javadocComment ->
-                currentClassDoc.setRawCommentText(javadocComment.getContent()));
-        classDocs.put(currentClassDoc.getFullPathName(), currentClassDoc);
         super.visit(n, arg);
     }
 
@@ -100,52 +98,141 @@ public class GroovydocJavaVisitor extends VoidVisitorAdapter<Object> {
 
     @Override
     public void visit(EnumDeclaration n, Object arg) {
-        List<String> imports = getImports();
-        currentClassDoc = new SimpleGroovyClassDoc(imports, aliases, n.getNameAsString(), links);
-        setModifiers(n.getModifiers(), currentClassDoc);
+        SimpleGroovyClassDoc parent = visit(n);
         currentClassDoc.setTokenType(SimpleGroovyDoc.ENUM_DEF);
-        currentClassDoc.setFullPathName(withSlashes(packagePath + FS + n.getNameAsString()));
+        super.visit(n, arg);
+        if (parent != null) {
+            currentClassDoc = parent;
+        }
+    }
+
+    @Override
+    public void visit(EnumConstantDeclaration n, Object arg) {
+        if (!currentClassDoc.isEnum()) {
+            throw new GroovyBugError("Annotation member definition found when not expected");
+        }
+        String enumConstantName = n.getNameAsString();
+        SimpleGroovyFieldDoc enumConstantDoc = new SimpleGroovyFieldDoc(enumConstantName, currentClassDoc);
+        enumConstantDoc.setType(new SimpleGroovyType(currentClassDoc.getTypeDescription()));
+        enumConstantDoc.setPublic(true);
+        currentClassDoc.addEnumConstant(enumConstantDoc);
+        processAnnotations(enumConstantDoc, n);
         n.getJavadocComment().ifPresent(javadocComment ->
-                currentClassDoc.setRawCommentText(javadocComment.getContent()));
-        classDocs.put(currentClassDoc.getFullPathName(), currentClassDoc);
+                enumConstantDoc.setRawCommentText(javadocComment.getContent()));
+        super.visit(n, arg);
+    }
+
+    @Override
+    public void visit(AnnotationDeclaration n, Object arg) {
+        SimpleGroovyClassDoc parent = visit(n);
+        currentClassDoc.setTokenType(SimpleGroovyDoc.ANNOTATION_DEF);
+        super.visit(n, arg);
+        if (parent != null) {
+            currentClassDoc.setPublic(true);
+            currentClassDoc = parent;
+        }
+    }
+
+    @Override
+    public void visit(AnnotationMemberDeclaration n, Object arg) {
+        if (!currentClassDoc.isAnnotationType()) {
+            throw new GroovyBugError("Annotation member definition found when not expected");
+        }
+        SimpleGroovyFieldDoc fieldDoc = new SimpleGroovyFieldDoc(n.getNameAsString(), currentClassDoc);
+        fieldDoc.setType(makeType(n.getType()));
+        setModifiers(n.getModifiers(), fieldDoc);
+        fieldDoc.setPublic(true);
+        processAnnotations(fieldDoc, n);
+        currentClassDoc.add(fieldDoc);
+        n.getJavadocComment().ifPresent(javadocComment ->
+                fieldDoc.setRawCommentText(javadocComment.getContent()));
+        n.getDefaultValue().ifPresent(defValue -> {
+            fieldDoc.setRawCommentText(fieldDoc.getRawCommentText() + "\n* @default " + defValue.toString());
+            fieldDoc.setConstantValueExpression(defValue.toString());
+        });
         super.visit(n, arg);
     }
 
     @Override
     public void visit(ClassOrInterfaceDeclaration n, Object arg) {
-        List<String> imports = getImports();
-        SimpleGroovyClassDoc parent = currentClassDoc;
-        String name = n.getNameAsString();
-        boolean nested = n.isNestedType();
-        if (nested) {
-            name = parent.simpleTypeName() + "." + name;
-        }
-        currentClassDoc = new SimpleGroovyClassDoc(imports, aliases, name, links);
-        if (nested) {
-            parent.addNested(currentClassDoc);
-        }
-        setModifiers(n.getModifiers(), currentClassDoc);
+        SimpleGroovyClassDoc parent = visit(n);
         if (n.isInterface()) {
             currentClassDoc.setTokenType(SimpleGroovyDoc.INTERFACE_DEF);
+        } else {
+            currentClassDoc.setTokenType(SimpleGroovyDoc.CLASS_DEF);
         }
         n.getExtendedTypes().forEach(et -> {
             if (n.isInterface()) {
-                currentClassDoc.addInterfaceName(et.getNameAsString());
+                currentClassDoc.addInterfaceName(fullName(et));
             } else {
-                currentClassDoc.setSuperClassName(et.getNameAsString());
+                currentClassDoc.setSuperClassName(fullName(et));
             }
         });
+        currentClassDoc.setNameWithTypeArgs(currentClassDoc.name() + genericTypesAsString(n.getTypeParameters()));
         n.getImplementedTypes().forEach(classOrInterfaceType ->
-                currentClassDoc.addInterfaceName(classOrInterfaceType.getNameAsString()));
-        currentClassDoc.setFullPathName(packagePath + FS + name);
-        currentClassDoc.setNameWithTypeArgs(name);
-        n.getJavadocComment().ifPresent(javadocComment ->
-                currentClassDoc.setRawCommentText(javadocComment.getContent()));
-        classDocs.put(currentClassDoc.getFullPathName(), currentClassDoc);
+                currentClassDoc.addInterfaceName(fullName(classOrInterfaceType)));
         super.visit(n, arg);
-        if (nested) {
+        if (parent != null) {
             currentClassDoc = parent;
         }
+    }
+
+    private String fullName(ClassOrInterfaceType et) {
+        StringBuilder name = new StringBuilder();
+        et.getScope().ifPresent(sc -> name.append(sc.toString()));
+        name.append(et.getNameAsString());
+        return name.toString();
+    }
+
+    private String genericTypesAsString(NodeList<TypeParameter> typeParameters) {
+        if (typeParameters == null || typeParameters.size() == 0)
+            return "";
+        return "<" + DefaultGroovyMethods.join(typeParameters, ", ") + ">";
+    }
+
+    private SimpleGroovyClassDoc visit(TypeDeclaration<?> n) {
+        SimpleGroovyClassDoc parent = null;
+        List<String> imports = getImports();
+        String name = n.getNameAsString();
+        if (n.isNestedType()) {
+            parent = currentClassDoc;
+            name = parent.name() + "$" + name;
+        }
+        currentClassDoc = new SimpleGroovyClassDoc(imports, aliases, name.replace('$', '.'), links);
+        NodeList<Modifier> mods = n.getModifiers();
+        if (parent != null) {
+            parent.addNested(currentClassDoc);
+            if (parent.isInterface()) {
+                // an inner interface/class within an interface is public
+                mods.add(Modifier.publicModifier());
+            }
+        }
+        setModifiers(mods, currentClassDoc);
+        processAnnotations(currentClassDoc, n);
+        currentClassDoc.setFullPathName(withSlashes(packagePath + FS + name));
+        classDocs.put(currentClassDoc.getFullPathName(), currentClassDoc);
+        n.getJavadocComment().ifPresent(javadocComment ->
+                currentClassDoc.setRawCommentText(javadocComment.getContent()));
+        return parent;
+    }
+
+    private void processAnnotations(SimpleGroovyProgramElementDoc element, NodeWithAnnotations<?> n) {
+        for (AnnotationExpr an : n.getAnnotations()) {
+            element.addAnnotationRef(new SimpleGroovyAnnotationRef(an.getNameAsString(), getAnnotationText(an)));
+        }
+    }
+
+    private void processAnnotations(SimpleGroovyParameter param, NodeWithAnnotations<?> n) {
+        for (AnnotationExpr an : n.getAnnotations()) {
+            param.addAnnotationRef(new SimpleGroovyAnnotationRef(an.getNameAsString(), getAnnotationText(an)));
+        }
+    }
+
+    private String getAnnotationText(final AnnotationExpr an) {
+        if (an != null && an.getTokenRange().isPresent()) {
+            return an.getTokenRange().get().toString();
+        }
+        return "";
     }
 
     private void setModifiers(NodeList<Modifier> modifiers, SimpleGroovyAbstractableElementDoc elementDoc) {
@@ -170,12 +257,13 @@ public class GroovydocJavaVisitor extends VoidVisitorAdapter<Object> {
     }
 
     private String withSlashes(String s) {
-        return s.replaceAll("\\.", "/").replaceAll("\\$", ".");
+        return s.replace('.', '/').replace('$', '.');
     }
 
     @Override
     public void visit(MethodDeclaration m, Object arg) {
         SimpleGroovyMethodDoc meth = new SimpleGroovyMethodDoc(m.getNameAsString(), currentClassDoc);
+        meth.setTypeParameters(genericTypesAsString(m.getTypeParameters()));
         meth.setReturnType(makeType(m.getType()));
         setConstructorOrMethodCommon(m, meth);
         currentClassDoc.add(meth);
@@ -194,12 +282,18 @@ public class GroovydocJavaVisitor extends VoidVisitorAdapter<Object> {
         super.visit(c, arg);
     }
 
-    private void setConstructorOrMethodCommon(CallableDeclaration<? extends CallableDeclaration> n, SimpleGroovyExecutableMemberDoc methOrCons) {
+    private void setConstructorOrMethodCommon(CallableDeclaration<? extends CallableDeclaration<?>> n, SimpleGroovyExecutableMemberDoc methOrCons) {
         n.getJavadocComment().ifPresent(javadocComment ->
                 methOrCons.setRawCommentText(javadocComment.getContent()));
-        setModifiers(n.getModifiers(), methOrCons);
+        NodeList<Modifier> mods = n.getModifiers();
+        if (currentClassDoc.isInterface()) {
+            mods.add(Modifier.publicModifier());
+        }
+        setModifiers(mods, methOrCons);
+        processAnnotations(methOrCons, n);
         for (Parameter param : n.getParameters()) {
             SimpleGroovyParameter p = new SimpleGroovyParameter(param.getNameAsString());
+            processAnnotations(p, param);
             p.setType(makeType(param.getType()));
             methOrCons.add(p);
         }
@@ -211,6 +305,7 @@ public class GroovydocJavaVisitor extends VoidVisitorAdapter<Object> {
         SimpleGroovyFieldDoc field = new SimpleGroovyFieldDoc(name, currentClassDoc);
         field.setType(makeType(f.getVariable(0).getType()));
         setModifiers(f.getModifiers(), field);
+        processAnnotations(field, f);
         f.getJavadocComment().ifPresent(javadocComment ->
                 field.setRawCommentText(javadocComment.getContent()));
         currentClassDoc.add(field);

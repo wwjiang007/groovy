@@ -24,6 +24,7 @@ import org.junit.Test
 
 import static groovy.test.GroovyAssert.assertScript
 import static groovy.test.GroovyAssert.shouldFail
+import static org.junit.Assume.assumeTrue
 
 final class GrapeIvyTest {
 
@@ -40,7 +41,7 @@ final class GrapeIvyTest {
             [groupId:'com.jidesoft', artifactId:'jide-oss', version:'2.2.12'],
             [groupId:'commons-lang', artifactId:'commons-lang', version:'2.6'],
             [groupId:'org.neo4j', artifactId:'neo4j-kernel', version:'2.0.0-RC1'],
-            [groupId:'commons-digester', artifactId:'commons-digester', version:'2.1'],
+            [groupId:'org.apache.commons', artifactId:'commons-digester3', version:'3.2'],
             [groupId:'net.sf.json-lib', artifactId:'json-lib', version:'2.2.3', classifier:'jdk15'],
             [groupId:'org.apache.ivy', artifactId:'ivy', version:'2.0.0', conf:['default', 'optional']]
         ].each { spec ->
@@ -365,10 +366,10 @@ final class GrapeIvyTest {
     @Test // BeanUtils is a transitive dependency for Digester
     void testTransitiveShorthandControl() {
         assertScript '''
-            @Grab('commons-digester:commons-digester:2.1')
-            import org.apache.commons.digester.Digester
+            @Grab('org.apache.commons:commons-digester3:3.2')
+            import org.apache.commons.digester3.Digester
 
-            assert Digester.name.size() == 36
+            assert Digester.name.size() == 37
             assert org.apache.commons.beanutils.BeanUtils.name.size() == 38
         '''
     }
@@ -376,39 +377,45 @@ final class GrapeIvyTest {
     @Test
     void testTransitiveShorthandExpectFailure() {
         shouldFail MissingPropertyException, '''
-            @Grab('commons-digester:commons-digester:2.1;transitive=false')
-            import org.apache.commons.digester.Digester
+            @Grab('org.apache.commons:commons-digester3:3.2;transitive=false')
+            import org.apache.commons.digester3.Digester
 
-            assert Digester.name.size() == 36
+            assert Digester.name.size() == 37
             assert org.apache.commons.beanutils.BeanUtils.name.size() == 38
         '''
     }
 
     @Test
-    void testAutoDownloadGrapeConfig() {
+    void testAutoDownloadGrapeConfigDefault() {
         assertScript '''
-            @Grab('commons-digester:commons-digester:2.1;transitive=false')
-            import org.apache.commons.digester.Digester
+            @Grab('org.apache.commons:commons-digester3:3.2;transitive=false')
+            import org.apache.commons.digester3.Digester
 
-            assert Digester.name.size() == 36
+            assert Digester.name.size() == 37
         '''
         assert Grape.instance.ivyInstance.settings.defaultResolver.name == 'downloadGrapes'
+    }
 
+    @Test
+    void testAutoDownloadGrapeConfigFalse() {
         assertScript '''
-            @Grab('commons-digester:commons-digester:2.1;transitive=false')
+            @Grab('org.apache.commons:commons-digester3:3.2;transitive=false')
             @GrabConfig(autoDownload=false)
-            import org.apache.commons.digester.Digester
+            import org.apache.commons.digester3.Digester
 
-            assert Digester.name.size() == 36
+            assert Digester.name.size() == 37
         '''
         assert Grape.instance.ivyInstance.settings.defaultResolver.name == 'cachedGrapes'
+    }
 
+    @Test
+    void testAutoDownloadGrapeConfigTrue() {
         assertScript '''
-            @Grab('commons-digester:commons-digester:2.1;transitive=false')
+            @Grab('org.apache.commons:commons-digester3:3.2;transitive=false')
             @GrabConfig(autoDownload=true)
-            import org.apache.commons.digester.Digester
+            import org.apache.commons.digester3.Digester
 
-            assert Digester.name.size() == 36
+            assert Digester.name.size() == 37
         '''
         assert Grape.instance.ivyInstance.settings.defaultResolver.name == 'downloadGrapes'
     }
@@ -460,5 +467,67 @@ final class GrapeIvyTest {
         }
 
         Grape.resolve([classLoader:loader], [], [groupId:'org.apache.poi', artifactId:'poi', version:'3.7'])
+    }
+
+    @Test // GROOVY-9312
+    void testResolveSucceedsFromLocalMavenRepository() {
+        assumeTrue System.getProperty('maven.home') != null
+        def tempDir = File.createTempDir()
+
+        new File(tempDir, 'pom.xml').write '''\
+            <?xml version="1.0" encoding="UTF-8"?>
+            <project
+              xmlns="http://maven.apache.org/POM/4.0.0"
+              xmlns:xsi="http://www.w3.org/2001/XMLSchema-instance"
+              xsi:schemaLocation="http://maven.apache.org/POM/4.0.0 http://maven.apache.org/maven-v4_0_0.xsd">
+                <modelVersion>4.0.0</modelVersion>
+                <groupId>org.codehaus.groovy.tests</groupId>
+                <artifactId>maven-bootstrap</artifactId>
+                <version>1.0-SNAPSHOT</version>
+                <dependencies>
+                    <dependency>
+                        <groupId>net.jqwik</groupId>
+                        <artifactId>jqwik</artifactId>
+                        <version>1.2.1</version>
+                    </dependency>
+                    <dependency>
+                        <groupId>net.jqwik</groupId>
+                        <artifactId>jqwik-engine</artifactId>
+                        <version>1.2.1</version>
+                    </dependency>
+                </dependencies>
+            </project>
+        '''.stripIndent()
+
+        try {
+            // prime "${user.home}/.m2/repository" with jqwik
+            assertScript """
+                @Grab('org.apache.maven.shared:maven-invoker:3.0.1')
+                import org.apache.maven.shared.invoker.*
+
+                def request = new DefaultInvocationRequest(goals: ['compile'],
+                    baseDirectory: new File('${tempDir.absolutePath.replace('\\', '\\\\')}'))
+                def result = new DefaultInvoker().execute(request)
+                assert result.exitCode == 0
+            """
+
+            assertScript '''
+                @Grab('net.jqwik:jqwik:1.2.1')
+                import net.jqwik.api.ForAll
+                import net.jqwik.api.Property
+
+                @groovy.transform.CompileStatic
+                class Jsr308 {
+                    @Property
+                    boolean 'size zero or positive'(@ForAll List<Integer> items) {
+                        items.size() >= 0
+                    }
+                }
+
+                println 'success'
+            '''
+        } finally {
+            tempDir.deleteDir()
+        }
     }
 }
