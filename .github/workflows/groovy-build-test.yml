@@ -46,7 +46,7 @@ jobs:
       - name: "📥 Checkout repository"
         uses: actions/checkout@v6
       - name: "☕️ Setup JDK"
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.2.0
         with:
           distribution: 'zulu'
           java-version: |
@@ -137,7 +137,7 @@ jobs:
       - name: "📥 Checkout repository"
         uses: actions/checkout@v6
       - name: "☕️ Setup JDK"
-        uses: actions/setup-java@v5
+        uses: actions/setup-java@v5.2.0
         with:
           distribution: 'zulu'
           java-version: |
